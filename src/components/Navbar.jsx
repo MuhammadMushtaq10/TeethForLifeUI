@@ -1,0 +1,117 @@
+import { useState } from 'react';
+import { Link, useLocation } from 'react-router-dom';
+import { useLang } from '../context/LanguageContext';
+
+export default function Navbar() {
+  const [open, setOpen] = useState(false);
+  const { t, toggleLang, isUrdu } = useLang();
+  const location = useLocation();
+
+  const isAdmin = location.pathname.startsWith('/admin');
+  if (isAdmin) return null;
+
+  const links = [
+    { to: '/', label: t('home') },
+    { to: '/services', label: t('services') },
+    { to: '/about', label: t('about') },
+    { to: '/contact', label: t('contact') },
+  ];
+
+  const isActive = (path) => location.pathname === path;
+
+  return (
+    <nav className="sticky top-0 z-50 bg-white/95 backdrop-blur-sm border-b border-gray-100">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex items-center justify-between h-[72px]">
+          {/* Logo */}
+          <Link to="/" className="flex items-center gap-2.5">
+            <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center">
+              <span className="text-white font-bold text-sm">TF</span>
+            </div>
+            <span className="text-[22px] font-bold text-text-main tracking-tight">Teeth For Life</span>
+          </Link>
+
+          {/* Desktop Nav */}
+          <div className="hidden lg:flex items-center gap-8">
+            {links.map((link) => (
+              <Link
+                key={link.to}
+                to={link.to}
+                className={`text-[15px] font-medium transition-colors ${
+                  isActive(link.to)
+                    ? 'text-primary'
+                    : 'text-text-muted hover:text-primary'
+                }`}
+              >
+                {link.label}
+              </Link>
+            ))}
+          </div>
+
+          {/* Right side */}
+          <div className="hidden lg:flex items-center gap-5">
+            <button
+              onClick={toggleLang}
+              className="px-2.5 py-1 text-xs border border-gray-200 rounded-md text-text-muted hover:bg-gray-50 transition-colors"
+            >
+              {isUrdu ? 'EN' : 'اردو'}
+            </button>
+            <a href="tel:+923158565662" className="flex items-center gap-2 text-text-main">
+              <div className="w-9 h-9 bg-primary-light rounded-full flex items-center justify-center">
+                <svg className="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                </svg>
+              </div>
+              <span className="text-sm font-semibold">+92 315 8565662</span>
+            </a>
+            <Link
+              to="/book"
+              className="bg-accent hover:bg-red-400 text-white font-semibold text-sm py-2.5 px-6 rounded-full transition-colors"
+            >
+              {t('bookAppointment')}
+            </Link>
+          </div>
+
+          {/* Mobile hamburger */}
+          <button className="lg:hidden p-2" onClick={() => setOpen(!open)} aria-label="Toggle menu">
+            <svg className="w-6 h-6 text-text-main" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              {open ? (
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              ) : (
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              )}
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      {/* Mobile menu */}
+      {open && (
+        <div className="lg:hidden border-t border-gray-100 bg-white">
+          <div className="px-4 py-4 space-y-1">
+            {links.map((link) => (
+              <Link
+                key={link.to}
+                to={link.to}
+                onClick={() => setOpen(false)}
+                className={`block py-2.5 px-3 rounded-lg text-sm font-medium ${
+                  isActive(link.to) ? 'text-primary bg-primary-light' : 'text-text-muted hover:bg-gray-50'
+                }`}
+              >
+                {link.label}
+              </Link>
+            ))}
+            <div className="flex items-center gap-3 pt-3 border-t border-gray-100 mt-2">
+              <button onClick={toggleLang} className="px-3 py-1.5 text-xs border border-gray-200 rounded-md">
+                {isUrdu ? 'EN' : 'اردو'}
+              </button>
+              <Link to="/book" onClick={() => setOpen(false)} className="bg-accent text-white font-semibold text-sm py-2.5 px-6 rounded-full">
+                {t('bookAppointment')}
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
+    </nav>
+  );
+}
