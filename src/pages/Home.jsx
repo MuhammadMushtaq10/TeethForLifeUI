@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useLang } from '../context/LanguageContext';
 import client from '../api/client';
+import ReviewForm from '../components/ReviewForm';
 
 const serviceImages = {
   'General Checkup': '/images/general-checkup.jfif',
@@ -74,10 +75,24 @@ function StarRating({ count }) {
 export default function Home() {
   const { t } = useLang();
   const [services, setServices] = useState([]);
+  const [reviews, setReviews] = useState([]);
+
+  const fetchReviews = () => {
+    client
+      .get('/api/reviews')
+      .then(res => setReviews(res.data.filter(r => r.comment)))
+      .catch(() => {});
+  };
 
   useEffect(() => {
     client.get('/api/services').then(res => setServices(res.data.slice(0, 6))).catch(() => {});
+    fetchReviews();
   }, []);
+
+  // Show real reviews when available; otherwise fall back to sample testimonials.
+  const displayedReviews = reviews.length
+    ? reviews.slice(0, 6).map(r => ({ name: r.patient_name, rating: r.rating, text: r.comment }))
+    : testimonials;
 
   return (
     <div>
@@ -252,83 +267,57 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Meet the Doctor */}
+      {/* How It Works */}
       <section className="py-20 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid lg:grid-cols-2 gap-16 items-center">
-            {/* Doctor photo placeholder */}
-            <div className="flex justify-center">
-              <div className="relative">
-                <div className="w-72 h-80 sm:w-80 sm:h-96 rounded-3xl overflow-hidden bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center">
-                  <img
-                    src="/images/doctor.jpg"
-                    alt="Dr. Mushtaq Fakhruddin"
-                    className="w-full h-full object-cover"
-                    onError={(e) => {
-                      e.target.style.display = 'none';
-                      e.target.parentElement.classList.add('flex', 'items-center', 'justify-center');
-                    }}
-                  />
-                  <svg className="w-28 h-28 text-primary/25 absolute" fill="none" stroke="currentColor" strokeWidth={0.8} viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
+          <div className="text-center mb-14">
+            <p className="text-primary font-semibold text-sm uppercase tracking-wider mb-2">Simple & Stress-Free</p>
+            <h2 className="text-3xl sm:text-4xl font-bold text-text-main">How It Works</h2>
+            <p className="text-text-muted mt-3 max-w-xl mx-auto">Getting the care you need takes just three easy steps.</p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {[
+              {
+                step: '01',
+                title: 'Book Online',
+                desc: 'Choose your service, pick a date and time slot that suits you, and confirm in under a minute.',
+                icon: 'M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.007v.008H3.75V6.75zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zM3.75 12h.007v.008H3.75V12zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm-.375 5.25h.007v.008H3.75v-.008zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z',
+              },
+              {
+                step: '02',
+                title: 'Get Confirmation',
+                desc: "We'll confirm your appointment by email and WhatsApp, with friendly reminders before your visit.",
+                icon: 'M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75',
+              },
+              {
+                step: '03',
+                title: 'Visit & Smile',
+                desc: 'Walk into our modern, comfortable clinic and leave with a healthier, brighter smile.',
+                icon: 'M15.182 15.182a4.5 4.5 0 01-6.364 0M21 12a9 9 0 11-18 0 9 9 0 0118 0zM9.75 9.75c0 .414-.168.75-.375.75S9 10.164 9 9.75 9.168 9 9.375 9s.375.336.375.75zm-.375 0h.008v.015h-.008V9.75zm5.625 0c0 .414-.168.75-.375.75s-.375-.336-.375-.75.168-.75.375-.75.375.336.375.75zm-.375 0h.008v.015h-.008V9.75z',
+              },
+            ].map((item, i) => (
+              <div key={i} className="relative bg-gray-50 rounded-2xl p-8 border border-gray-100 hover:shadow-md transition-shadow">
+                <span className="absolute top-6 right-6 text-4xl font-bold text-primary/10">{item.step}</span>
+                <div className="w-14 h-14 bg-primary-light rounded-2xl flex items-center justify-center mb-5">
+                  <svg className="w-7 h-7 text-primary" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d={item.icon} />
                   </svg>
                 </div>
-                {/* Experience badge */}
-                <div className="absolute -bottom-3 -right-3 bg-primary text-white rounded-2xl py-3 px-5 shadow-lg">
-                  <p className="text-2xl font-bold">15+</p>
-                  <p className="text-xs opacity-90">Years Exp.</p>
-                </div>
+                <h3 className="text-lg font-bold text-text-main mb-2">{item.title}</h3>
+                <p className="text-text-muted text-sm leading-relaxed">{item.desc}</p>
               </div>
-            </div>
-            {/* Doctor info */}
-            <div>
-              <div className="inline-flex items-center gap-2 bg-primary-light rounded-full px-4 py-1.5 mb-4">
-                <svg className="w-4 h-4 text-primary" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.563.563 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.204-3.602a.563.563 0 01.321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5z" />
-                </svg>
-                <span className="text-sm font-medium text-primary">Lead Dentist & Founder</span>
-              </div>
-              <h2 className="text-3xl sm:text-4xl font-bold text-text-main mb-2">Dr. Mushtaq Fakhruddin</h2>
-              <p className="text-primary font-medium mb-6">BDS, FCPS (Operative Dentistry)</p>
-              <blockquote className="border-l-4 border-primary pl-4 mb-6 italic text-text-muted">
-                "Every patient deserves a healthy, confident smile. That's the standard I hold myself and my team to every day."
-              </blockquote>
-              <ul className="space-y-3 mb-8">
-                <li className="flex items-start gap-3">
-                  <svg className="w-5 h-5 text-primary mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  <span className="text-text-muted text-sm">Specializes in restorative and cosmetic dentistry</span>
-                </li>
-                <li className="flex items-start gap-3">
-                  <svg className="w-5 h-5 text-primary mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  <span className="text-text-muted text-sm">Over 5,000 successful procedures performed</span>
-                </li>
-                <li className="flex items-start gap-3">
-                  <svg className="w-5 h-5 text-primary mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  <span className="text-text-muted text-sm">Member of Pakistan Dental Association</span>
-                </li>
-                <li className="flex items-start gap-3">
-                  <svg className="w-5 h-5 text-primary mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  <span className="text-text-muted text-sm">15+ years of clinical experience in Karachi</span>
-                </li>
-              </ul>
-              <Link
-                to="/about"
-                className="inline-flex items-center gap-2 text-primary hover:text-primary-dark font-semibold text-sm transition-colors"
-              >
-                Read Full Bio
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
-                </svg>
-              </Link>
-            </div>
+            ))}
+          </div>
+          <div className="text-center mt-12">
+            <Link
+              to="/book"
+              className="inline-flex items-center gap-2 bg-accent hover:bg-red-400 text-white font-semibold text-sm py-3.5 px-8 rounded-full transition-colors"
+            >
+              {t('bookAppointment')}
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+              </svg>
+            </Link>
           </div>
         </div>
       </section>
@@ -341,13 +330,13 @@ export default function Home() {
             <h2 className="text-3xl sm:text-4xl font-bold text-text-main">What Our Patients Say</h2>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {testimonials.map((review, i) => (
+            {displayedReviews.map((review, i) => (
               <div key={i} className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
                 <StarRating count={review.rating} />
                 <p className="text-text-muted mt-4 text-sm leading-relaxed">"{review.text}"</p>
                 <div className="flex items-center gap-3 mt-5 pt-4 border-t border-gray-50">
                   <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center">
-                    <span className="text-primary font-semibold text-sm">{review.name[0]}</span>
+                    <span className="text-primary font-semibold text-sm">{review.name?.[0] || '?'}</span>
                   </div>
                   <div>
                     <p className="font-semibold text-text-main text-sm">{review.name}</p>
@@ -356,6 +345,11 @@ export default function Home() {
                 </div>
               </div>
             ))}
+          </div>
+
+          {/* Leave a review */}
+          <div className="mt-14">
+            <ReviewForm onSubmitted={fetchReviews} />
           </div>
         </div>
       </section>

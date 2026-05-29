@@ -1,16 +1,32 @@
 import { useForm } from 'react-hook-form';
 import { useState } from 'react';
 import { useLang } from '../context/LanguageContext';
+import client from '../api/client';
 
 export default function Contact() {
   const { t } = useLang();
   const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState(null);
   const { register, handleSubmit, reset, formState: { errors } } = useForm();
 
-  const onSubmit = () => {
-    setSubmitted(true);
-    reset();
-    setTimeout(() => setSubmitted(false), 5000);
+  const onSubmit = async (data) => {
+    setSubmitting(true);
+    setError(null);
+    try {
+      await client.post('/api/contact', data);
+      setSubmitted(true);
+      reset();
+      setTimeout(() => setSubmitted(false), 5000);
+    } catch (err) {
+      setError(
+        err.response?.data?.error ||
+        err.response?.data?.errors?.[0]?.message ||
+        'Failed to send message. Please try again.'
+      );
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -87,6 +103,15 @@ export default function Contact() {
                 </div>
               )}
 
+              {error && (
+                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl mb-6 text-sm flex items-start gap-3">
+                  <svg className="w-5 h-5 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+                  </svg>
+                  {error}
+                </div>
+              )}
+
               <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
                 <div className="grid sm:grid-cols-2 gap-5">
                   <div>
@@ -143,9 +168,10 @@ export default function Contact() {
 
                 <button
                   type="submit"
-                  className="bg-accent hover:bg-red-400 text-white font-semibold text-sm py-3 px-8 rounded-full transition-colors"
+                  disabled={submitting}
+                  className="bg-accent hover:bg-red-400 text-white font-semibold text-sm py-3 px-8 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {t('sendMessage')}
+                  {submitting ? 'Sending...' : t('sendMessage')}
                 </button>
               </form>
             </div>

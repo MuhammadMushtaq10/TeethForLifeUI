@@ -243,13 +243,17 @@ export default function BookAppointment() {
 
               <div className="grid sm:grid-cols-2 gap-5 mb-6">
                 <div>
-                  <label className="block text-sm font-medium text-text-main mb-1.5">{t('email')}</label>
+                  <label className="block text-sm font-medium text-text-main mb-1.5">{t('email')} *</label>
                   <input
-                    {...register('email')}
+                    {...register('email', {
+                      required: 'Email is required',
+                      pattern: { value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/, message: 'Invalid email' },
+                    })}
                     type="email"
                     className="input-field text-sm"
-                    placeholder="your@email.com (optional)"
+                    placeholder="your@email.com"
                   />
+                  {errors.email && <p className="text-accent text-xs mt-1">{errors.email.message}</p>}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-text-main mb-1.5">{t('notes')}</label>
