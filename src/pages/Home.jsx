@@ -97,7 +97,7 @@ export default function Home() {
   return (
     <div>
       {/* Hero Section */}
-      <section className="bg-gradient-to-br from-primary-light via-white to-blue-50">
+      <section className="bg-gradient-to-br from-primary-light via-white to-blue-50 dark:from-slate-900 dark:via-slate-900 dark:to-slate-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 lg:py-24">
           <div className="grid lg:grid-cols-2 gap-12 items-center">
             <div>
@@ -366,7 +366,7 @@ export default function Home() {
             <div className="lg:col-span-2 rounded-2xl overflow-hidden">
               <iframe
                 title="Teeth For Life Location"
-                src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3619.827!2d67.0765!3d24.8607!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x0%3A0x0!2zMjTCsDUxJzM4LjUiTiA2N8KwMDQnMzUuNCJF!5e0!3m2!1sen!2spk!4v1"
+                src="https://maps.google.com/maps?q=24.8673448,67.080464&z=18&output=embed"
                 width="100%"
                 height="320"
                 style={{ border: 0 }}
@@ -413,7 +413,7 @@ export default function Home() {
                 href="https://maps.app.goo.gl/92QNGr4PBq1zpJkH7"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="mt-8 bg-white text-primary font-semibold text-sm py-3 px-6 rounded-full text-center hover:bg-white/90 transition-colors"
+                className="mt-8 bg-[#ffffff] text-primary font-semibold text-sm py-3 px-6 rounded-full text-center hover:bg-[#eaf6ff] transition-colors"
               >
                 Get Directions
               </a>

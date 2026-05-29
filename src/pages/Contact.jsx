@@ -207,7 +207,7 @@ export default function Contact() {
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
               <iframe
                 title="Teeth For Life Location"
-                src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3619.827!2d67.0765!3d24.8607!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x0%3A0x0!2zMjTCsDUxJzM4LjUiTiA2N8KwMDQnMzUuNCJF!5e0!3m2!1sen!2spk!4v1"
+                src="https://maps.google.com/maps?q=24.8673448,67.080464&z=18&output=embed"
                 width="100%"
                 height="200"
                 style={{ border: 0 }}

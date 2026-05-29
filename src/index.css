@@ -3,6 +3,29 @@
 @tailwind utilities;
 
 @layer base {
+  /* Theme tokens as RGB channels so Tailwind's /opacity modifiers keep working.
+     Light values match the original palette exactly. */
+  :root {
+    --c-bg-base: 255 255 255;     /* white  — cards / surfaces */
+    --c-bg-subtle: 249 250 251;   /* gray-50 — alternating sections */
+    --c-bg-muted: 243 244 246;    /* gray-100 */
+    --c-border-soft: 243 244 246; /* gray-100 borders */
+    --c-border-base: 229 231 235; /* gray-200 borders */
+    --c-text-main: 26 26 46;      /* #1A1A2E */
+    --c-text-muted: 90 106 122;   /* #5A6A7A */
+    --c-primary-light: 245 251 255; /* #F5FBFF */
+  }
+  .dark {
+    --c-bg-base: 30 41 59;        /* slate-800 — cards / surfaces */
+    --c-bg-subtle: 15 23 42;      /* slate-900 — page sections */
+    --c-bg-muted: 51 65 85;       /* slate-700 */
+    --c-border-soft: 51 65 85;    /* slate-700 borders */
+    --c-border-base: 71 85 105;   /* slate-600 borders */
+    --c-text-main: 226 232 240;   /* slate-200 */
+    --c-text-muted: 148 163 184;  /* slate-400 */
+    --c-primary-light: 12 31 45;  /* deep tinted surface */
+  }
+
   html {
     scroll-behavior: smooth;
   }
@@ -10,6 +33,9 @@
     font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    background-color: rgb(var(--c-bg-subtle));
+    color: rgb(var(--c-text-main));
+    transition: background-color 0.2s ease, color 0.2s ease;
   }
 }
 
