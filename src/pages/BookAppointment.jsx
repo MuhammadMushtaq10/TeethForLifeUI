@@ -299,12 +299,8 @@ export default function BookAppointment() {
               </div>
               <div className="space-y-2.5 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-text-muted">Monday — Friday</span>
-                  <span className="font-medium text-text-main">9:00 AM — 7:00 PM</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-text-muted">Saturday</span>
-                  <span className="font-medium text-text-main">9:00 AM — 7:00 PM</span>
+                  <span className="text-text-muted">Mon – Sat</span>
+                  <span className="font-medium text-text-main">10:00 AM – 7:00 PM</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-text-muted">Sunday</span>

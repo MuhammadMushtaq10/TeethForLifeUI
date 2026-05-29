@@ -32,7 +32,7 @@ const translations = {
     step: 'Step',
     of: 'of',
     clinicHours: 'Clinic Hours',
-    monSat: 'Monday – Saturday',
+    monSat: 'Mon – Sat',
     sunday: 'Sunday',
     closed: 'Closed',
     address: 'Address',

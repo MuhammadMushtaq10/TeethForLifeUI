@@ -190,12 +190,10 @@ export default function Contact() {
                 <h3 className="font-semibold text-text-main">{t('clinicHours')}</h3>
               </div>
               <div className="space-y-2.5 text-sm">
-                {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].map((day) => (
-                  <div key={day} className="flex justify-between text-sm">
-                    <span className="text-text-muted">{day}</span>
-                    <span className="text-text-main font-medium">9 AM — 7 PM</span>
-                  </div>
-                ))}
+                <div className="flex justify-between text-sm">
+                  <span className="text-text-muted">{t('monSat')}</span>
+                  <span className="text-text-main font-medium">10:00 AM – 7:00 PM</span>
+                </div>
                 <div className="flex justify-between text-sm pt-1 border-t border-gray-100">
                   <span className="text-text-muted">{t('sunday')}</span>
                   <span className="text-accent font-medium">{t('closed')}</span>

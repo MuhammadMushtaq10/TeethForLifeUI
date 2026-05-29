@@ -398,7 +398,7 @@ export default function Home() {
                     <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                   <div className="opacity-90">
-                    <p>Mon — Sat: 9:00 AM — 7:00 PM</p>
+                    <p>Mon – Sat: 10:00 AM – 7:00 PM</p>
                     <p>Sunday: Closed</p>
                   </div>
                 </div>

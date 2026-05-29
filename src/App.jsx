@@ -8,6 +8,8 @@ import Services from './pages/Services';
 import BookAppointment from './pages/BookAppointment';
 import About from './pages/About';
 import Contact from './pages/Contact';
+import Privacy from './pages/Privacy';
+import Terms from './pages/Terms';
 import Login from './pages/admin/Login';
 import Dashboard from './pages/admin/Dashboard';
 import Appointments from './pages/admin/Appointments';
@@ -24,6 +26,8 @@ export default function App() {
           <Route path="/book" element={<BookAppointment />} />
           <Route path="/about" element={<About />} />
           <Route path="/contact" element={<Contact />} />
+          <Route path="/privacy" element={<Privacy />} />
+          <Route path="/terms" element={<Terms />} />
           <Route path="/admin/login" element={<Login />} />
           <Route
             path="/admin/dashboard"
