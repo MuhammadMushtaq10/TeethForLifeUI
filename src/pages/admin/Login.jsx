@@ -29,8 +29,10 @@ export default function Login() {
     <div className="min-h-screen bg-gray-100 flex items-center justify-center px-4">
       <div className="bg-white rounded-2xl shadow-lg p-8 w-full max-w-md">
         <div className="text-center mb-8">
-          <span className="text-4xl">🦷</span>
-          <h1 className="text-2xl font-bold text-text-main mt-2">Admin Login</h1>
+          <div className="mx-auto w-14 h-14 rounded-2xl bg-primary flex items-center justify-center shadow-sm">
+            <span className="text-white font-bold text-lg tracking-tight">TF</span>
+          </div>
+          <h1 className="text-2xl font-bold text-text-main mt-4">Admin Login</h1>
           <p className="text-text-muted text-sm mt-1">Teeth For Life Management</p>
         </div>
 
