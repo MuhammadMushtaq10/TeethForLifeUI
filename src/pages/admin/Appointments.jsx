@@ -5,8 +5,10 @@ import PaymentModal from '../../components/admin/PaymentModal';
 import StatusBadge from '../../components/admin/StatusBadge';
 import { TableSkeleton } from '../../components/admin/Skeleton';
 import EmptyState from '../../components/admin/EmptyState';
+import ConfirmDialog from '../../components/admin/ConfirmDialog';
+import Icon from '../../components/admin/Icon';
 import client from '../../api/client';
-import { getAppointmentInvoice } from '../../api/admin';
+import { getAppointmentInvoice, deleteAppointment } from '../../api/admin';
 
 const STATUS_OPTIONS = ['PENDING', 'CONFIRMED', 'CANCELLED', 'NO_SHOW', 'COMPLETED'];
 
@@ -15,6 +17,9 @@ export default function Appointments() {
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [paymentInvoice, setPaymentInvoice] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteForce, setDeleteForce] = useState(false);
   const [filterDate, setFilterDate] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
   const [search, setSearch] = useState('');
@@ -74,6 +79,31 @@ export default function Appointments() {
     }
   };
 
+  const openDelete = (apt) => {
+    setDeleteForce(false); // escalate to force only if the API reports a linked invoice
+    setDeleteTarget(apt);
+  };
+
+  const doDelete = async () => {
+    setDeleteBusy(true);
+    try {
+      await deleteAppointment(deleteTarget.id, { force: deleteForce });
+      toast.success('Appointment deleted');
+      setAppointments((prev) => prev.filter((a) => a.id !== deleteTarget.id));
+      setDeleteTarget(null);
+      setDeleteForce(false);
+    } catch (err) {
+      // 409 HAS_INVOICE on the first (non-forced) attempt — escalate to a force confirm.
+      if (err.response?.status === 409 && !deleteForce) {
+        setDeleteForce(true);
+      } else {
+        toast.error(err.response?.data?.error || 'Failed to delete appointment');
+      }
+    } finally {
+      setDeleteBusy(false);
+    }
+  };
+
   const exportCSV = () => {
     const params = new URLSearchParams();
     if (filterDate) params.append('from', filterDate);
@@ -121,7 +151,7 @@ export default function Appointments() {
 
       {/* Table */}
       {loading ? (
-        <TableSkeleton rows={8} cols={7} />
+        <TableSkeleton rows={8} cols={9} />
       ) : appointments.length === 0 ? (
         <div className="bg-white rounded-xl shadow-sm">
           <EmptyState icon="📅" title="No appointments found" message="Try adjusting the filters, or add a new appointment." />
@@ -140,6 +170,7 @@ export default function Appointments() {
                   <th className="px-4 py-3 text-left font-medium text-text-muted">Invoice</th>
                   <th className="px-4 py-3 text-left font-medium text-text-muted">Source</th>
                   <th className="px-4 py-3 text-left font-medium text-text-muted">Notes</th>
+                  <th className="px-4 py-3 text-right font-medium text-text-muted">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -178,6 +209,18 @@ export default function Appointments() {
                       </span>
                     </td>
                     <td className="px-4 py-3 text-text-muted text-xs max-w-[150px] truncate">{apt.notes || '—'}</td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center justify-end">
+                        <button
+                          onClick={() => openDelete(apt)}
+                          title="Delete appointment"
+                          aria-label="Delete appointment"
+                          className="text-text-muted hover:text-accent"
+                        >
+                          <Icon name="🗑" className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -192,6 +235,20 @@ export default function Appointments() {
         invoice={paymentInvoice}
         onClose={() => setPaymentInvoice(null)}
         onSuccess={fetchAppointments}
+      />
+      <ConfirmDialog
+        isOpen={!!deleteTarget}
+        onClose={() => { setDeleteTarget(null); setDeleteForce(false); }}
+        onConfirm={doDelete}
+        busy={deleteBusy}
+        title={deleteForce ? 'Delete appointment with a linked invoice?' : 'Delete Appointment?'}
+        message={
+          deleteForce
+            ? `This appointment has an active invoice. Deleting it will keep the invoice but unlink it from the appointment. This cannot be undone. To cancel the visit instead, set its status to CANCELLED.`
+            : `${deleteTarget?.patient_name || 'This'}'s appointment on ${deleteTarget?.appointment_date || ''} will be permanently deleted. This cannot be undone — to cancel the visit, set its status to CANCELLED instead.`
+        }
+        confirmLabel={deleteForce ? 'Delete Anyway' : 'Delete'}
+        cancelLabel="Keep Appointment"
       />
     </div>
   );

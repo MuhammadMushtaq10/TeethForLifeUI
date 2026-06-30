@@ -73,6 +73,20 @@ export function cancelInvoice(id) {
   return client.delete(`/api/admin/invoices/${id}/cancel`).then((res) => res.data);
 }
 
+/**
+ * DELETE /api/admin/invoices/:id — hard-delete an invoice (for erroneous/test records;
+ * prefer cancelInvoice for real corrections). The backend replies 409 (`HAS_PAYMENTS`)
+ * if the invoice has payments; retry with { force: true } to delete it and its payments.
+ */
+export function deleteInvoice(id, { force = false } = {}) {
+  return client.delete(`/api/admin/invoices/${id}${force ? '?force=true' : ''}`).then((res) => res.data);
+}
+
+/** DELETE /api/admin/invoices/:invoiceId/payments/:paymentId — removes one payment; backend re-derives the invoice's paid/unpaid status. */
+export function deletePayment(invoiceId, paymentId) {
+  return client.delete(`/api/admin/invoices/${invoiceId}/payments/${paymentId}`).then((res) => res.data);
+}
+
 /** GET /api/admin/invoices/:id/pdf -> blob; triggers a browser download named invoice-<number>.pdf */
 export function downloadInvoicePdf(id, invoiceNumber) {
   return client
@@ -94,6 +108,11 @@ export function createTreatment(data) {
 /** PATCH /api/admin/treatments/:id */
 export function updateTreatment(id, data) {
   return client.patch(`/api/admin/treatments/${id}`, data).then((res) => res.data);
+}
+
+/** DELETE /api/admin/treatments/:id — leaf record, deletes immediately. */
+export function deleteTreatment(id) {
+  return client.delete(`/api/admin/treatments/${id}`).then((res) => res.data);
 }
 
 /** GET /api/admin/patients/:id/treatments -> [{ id, treatment_date, service_name, tooth_numbers, diagnosis, treatment_notes, next_visit_notes }] */
@@ -203,6 +222,15 @@ export function getPatientAppointments(patientId, filters = {}) {
 /** GET /api/admin/appointments/:id/invoice -> invoice for an appointment (or null). Used by the POS toast. */
 export function getAppointmentInvoice(appointmentId) {
   return client.get(`/api/admin/appointments/${appointmentId}/invoice`).then((res) => res.data);
+}
+
+/**
+ * DELETE /api/admin/appointments/:id — delete an appointment (prefer status CANCELLED for
+ * real cancellations). The backend replies 409 (`HAS_INVOICE`) if a non-cancelled invoice is
+ * linked; retry with { force: true } to delete the appointment (the invoice is kept but unlinked).
+ */
+export function deleteAppointment(id, { force = false } = {}) {
+  return client.delete(`/api/admin/appointments/${id}${force ? '?force=true' : ''}`).then((res) => res.data);
 }
 
 /** GET /api/services -> service catalogue (shared with public site). */

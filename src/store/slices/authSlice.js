@@ -5,7 +5,7 @@ export const loginAdmin = createAsyncThunk(
   'auth/login',
   async ({ email, password }, { rejectWithValue }) => {
     try {
-      const { data } = await client.post('/api/admin/login', { email, password });
+      const { data } = await client.post('/api/admin', { email, password });
       localStorage.setItem('token', data.token);
       return data;
     } catch (err) {

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { getInvoices, cancelInvoice, downloadInvoicePdf, unwrapList } from '../../api/admin';
+import { getInvoices, cancelInvoice, deleteInvoice, downloadInvoicePdf, unwrapList } from '../../api/admin';
 import StatCard from '../../components/admin/StatCard';
 import StatusBadge from '../../components/admin/StatusBadge';
 import EmptyState from '../../components/admin/EmptyState';
@@ -9,6 +9,7 @@ import { TableSkeleton, CardsSkeleton } from '../../components/admin/Skeleton';
 import InvoiceModal from '../../components/admin/InvoiceModal';
 import PaymentModal from '../../components/admin/PaymentModal';
 import ConfirmDialog from '../../components/admin/ConfirmDialog';
+import Icon from '../../components/admin/Icon';
 import { formatPKR, formatDate } from '../../utils/format';
 import { INVOICE_STATUSES } from '../../utils/constants';
 
@@ -33,6 +34,9 @@ export default function Billing() {
   const [paymentInvoice, setPaymentInvoice] = useState(null);
   const [cancelTarget, setCancelTarget] = useState(null);
   const [cancelBusy, setCancelBusy] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteForce, setDeleteForce] = useState(false);
   const [pdfBusyId, setPdfBusyId] = useState(null);
 
   const fetchInvoices = useCallback(() => {
@@ -99,6 +103,32 @@ export default function Billing() {
       toast.error(err.response?.data?.error || 'Failed to cancel invoice');
     } finally {
       setCancelBusy(false);
+    }
+  };
+
+  const openDelete = (inv) => {
+    setDeleteForce(false); // start non-forced; escalate only if the API reports payments
+    setDeleteTarget(inv);
+  };
+
+  const doDelete = async () => {
+    setDeleteBusy(true);
+    try {
+      await deleteInvoice(deleteTarget.id, { force: deleteForce });
+      toast.success('Invoice deleted');
+      setDeleteTarget(null);
+      setDeleteForce(false);
+      fetchInvoices();
+    } catch (err) {
+      // 409 HAS_PAYMENTS on the first (non-forced) attempt — keep the dialog open and
+      // escalate to a force-delete confirmation rather than failing outright.
+      if (err.response?.status === 409 && !deleteForce) {
+        setDeleteForce(true);
+      } else {
+        toast.error(err.response?.data?.error || 'Failed to delete invoice');
+      }
+    } finally {
+      setDeleteBusy(false);
     }
   };
 
@@ -245,6 +275,14 @@ export default function Billing() {
                           {cancellable && (
                             <button onClick={() => setCancelTarget(inv)} className="text-accent hover:text-red-700">Cancel</button>
                           )}
+                          <button
+                            onClick={() => openDelete(inv)}
+                            title="Delete invoice"
+                            aria-label="Delete invoice"
+                            className="text-text-muted hover:text-accent"
+                          >
+                            <Icon name="🗑" className="w-4 h-4" />
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -296,6 +334,20 @@ export default function Billing() {
         title="Cancel Invoice?"
         message={`Invoice ${cancelTarget?.invoice_number || ''} will be marked as cancelled. This cannot be undone.`}
         confirmLabel="Cancel Invoice"
+        cancelLabel="Keep Invoice"
+      />
+      <ConfirmDialog
+        isOpen={!!deleteTarget}
+        onClose={() => { setDeleteTarget(null); setDeleteForce(false); }}
+        onConfirm={doDelete}
+        busy={deleteBusy}
+        title={deleteForce ? 'Delete invoice and its payments?' : 'Delete Invoice?'}
+        message={
+          deleteForce
+            ? `Invoice ${deleteTarget?.invoice_number || ''} has recorded payments. Deleting it will also permanently remove those payment records. This cannot be undone. Consider cancelling the invoice instead.`
+            : `Invoice ${deleteTarget?.invoice_number || ''} will be permanently deleted. This cannot be undone — to keep a record, use Cancel instead.`
+        }
+        confirmLabel={deleteForce ? 'Delete + Payments' : 'Delete'}
         cancelLabel="Keep Invoice"
       />
     </div>

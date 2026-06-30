@@ -6,6 +6,8 @@ import {
   getPatientLedger,
   getPatientTreatments,
   getInvoice,
+  deleteTreatment,
+  deletePayment,
   downloadInvoicePdf,
   downloadPatientLedgerPdf,
   unwrapList,
@@ -17,6 +19,8 @@ import { BlockSkeleton, CardsSkeleton, TableSkeleton } from '../../components/ad
 import TreatmentModal from '../../components/admin/TreatmentModal';
 import PaymentModal from '../../components/admin/PaymentModal';
 import InvoiceModal from '../../components/admin/InvoiceModal';
+import ConfirmDialog from '../../components/admin/ConfirmDialog';
+import Icon from '../../components/admin/Icon';
 import { formatPKR, formatDate, formatDateTime } from '../../utils/format';
 import { paymentMethodLabel } from '../../utils/constants';
 
@@ -61,6 +65,9 @@ export default function PatientProfile() {
   const [expanded, setExpanded] = useState(null);
   const [paymentsCache, setPaymentsCache] = useState({});
   const [pdfBusyId, setPdfBusyId] = useState(null);
+  const [treatmentDeleteTarget, setTreatmentDeleteTarget] = useState(null);
+  const [paymentDeleteTarget, setPaymentDeleteTarget] = useState(null); // { payment, invoiceId }
+  const [deleteBusy, setDeleteBusy] = useState(false);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -111,6 +118,40 @@ export default function PatientProfile() {
       toast.error('Failed to download invoice PDF');
     } finally {
       setPdfBusyId(null);
+    }
+  };
+
+  const doDeleteTreatment = async () => {
+    setDeleteBusy(true);
+    try {
+      await deleteTreatment(treatmentDeleteTarget.id);
+      toast.success('Treatment deleted');
+      setTreatmentDeleteTarget(null);
+      load();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to delete treatment');
+    } finally {
+      setDeleteBusy(false);
+    }
+  };
+
+  const doDeletePayment = async () => {
+    const { payment, invoiceId } = paymentDeleteTarget;
+    setDeleteBusy(true);
+    try {
+      await deletePayment(invoiceId, payment.id);
+      toast.success('Payment deleted');
+      // Drop it from the expanded list immediately, then reload ledger totals/status.
+      setPaymentsCache((c) => ({
+        ...c,
+        [invoiceId]: (c[invoiceId] || []).filter((x) => x.id !== payment.id),
+      }));
+      setPaymentDeleteTarget(null);
+      load();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to delete payment');
+    } finally {
+      setDeleteBusy(false);
     }
   };
 
@@ -241,12 +282,22 @@ export default function PatientProfile() {
                       <p className="font-semibold text-text-main">{t.service_name || 'Treatment'}</p>
                       <p className="text-xs text-text-muted">{formatDate(t.treatment_date || t.created_at)}</p>
                     </div>
-                    <button
-                      onClick={() => setTreatmentModal({ open: true, treatment: t })}
-                      className="text-xs text-primary hover:text-primary-dark font-medium shrink-0"
-                    >
-                      Edit
-                    </button>
+                    <div className="flex items-center gap-3 shrink-0">
+                      <button
+                        onClick={() => setTreatmentModal({ open: true, treatment: t })}
+                        className="text-xs text-primary hover:text-primary-dark font-medium"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => setTreatmentDeleteTarget(t)}
+                        title="Delete treatment"
+                        aria-label="Delete treatment"
+                        className="text-text-muted hover:text-accent"
+                      >
+                        <Icon name="🗑" className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
                   <dl className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-sm">
                     {toothList(t.tooth_numbers) && (
@@ -335,6 +386,7 @@ export default function PatientProfile() {
                         payments={paymentsCache[inv.id]}
                         onToggle={() => toggleExpand(inv)}
                         onAddPayment={() => setPaymentInvoice(inv)}
+                        onDeletePayment={(p) => setPaymentDeleteTarget({ payment: p, invoiceId: inv.id })}
                         onPdf={() => handleInvoicePdf(inv)}
                         pdfBusy={pdfBusyId === inv.id}
                       />
@@ -367,13 +419,38 @@ export default function PatientProfile() {
         onClose={() => setPaymentInvoice(null)}
         onSuccess={load}
       />
+      <ConfirmDialog
+        isOpen={!!treatmentDeleteTarget}
+        onClose={() => setTreatmentDeleteTarget(null)}
+        onConfirm={doDeleteTreatment}
+        busy={deleteBusy}
+        title="Delete Treatment?"
+        message={`This treatment record (${treatmentDeleteTarget?.service_name || 'Treatment'}, ${formatDate(treatmentDeleteTarget?.treatment_date || treatmentDeleteTarget?.created_at)}) will be permanently deleted. This cannot be undone.`}
+        confirmLabel="Delete"
+        cancelLabel="Keep"
+      />
+      <ConfirmDialog
+        isOpen={!!paymentDeleteTarget}
+        onClose={() => setPaymentDeleteTarget(null)}
+        onConfirm={doDeletePayment}
+        busy={deleteBusy}
+        title="Delete Payment?"
+        message={`This payment of ${formatPKR(paymentDeleteTarget?.payment?.amount)} will be permanently deleted and the invoice's paid balance recalculated. This cannot be undone.`}
+        confirmLabel="Delete"
+        cancelLabel="Keep"
+      />
     </div>
   );
 }
 
 // Invoice row + expandable payment history.
-function FragmentRow({ inv, expanded, payments, onToggle, onAddPayment, onPdf, pdfBusy }) {
+function FragmentRow({ inv, expanded, payments, onToggle, onAddPayment, onDeletePayment, onPdf, pdfBusy }) {
   const cancelled = inv.status === 'CANCELLED';
+  // The ledger endpoint may send total_amount/total_paid/balance_due while the
+  // billing list sends the short total/paid/balance aliases — accept either.
+  const total = Number(inv.total ?? inv.total_amount) || 0;
+  const paid = Number(inv.paid ?? inv.total_paid) || 0;
+  const balance = Number(inv.balance ?? inv.balance_due) || 0;
   return (
     <>
       <tr className="hover:bg-gray-50">
@@ -392,15 +469,15 @@ function FragmentRow({ inv, expanded, payments, onToggle, onAddPayment, onPdf, p
           </button>
         </td>
         <td className="px-4 py-3 text-text-main whitespace-nowrap">{formatDate(inv.created_at || inv.invoice_date)}</td>
-        <td className="px-4 py-3 text-right text-text-main">{formatPKR(inv.total)}</td>
-        <td className="px-4 py-3 text-right text-text-main">{formatPKR(inv.paid)}</td>
-        <td className={`px-4 py-3 text-right font-medium ${Number(inv.balance) > 0 ? 'text-accent' : 'text-text-main'}`}>
-          {formatPKR(inv.balance)}
+        <td className="px-4 py-3 text-right text-text-main">{formatPKR(total)}</td>
+        <td className="px-4 py-3 text-right text-text-main">{formatPKR(paid)}</td>
+        <td className={`px-4 py-3 text-right font-medium ${balance > 0 ? 'text-accent' : 'text-text-main'}`}>
+          {formatPKR(balance)}
         </td>
         <td className="px-4 py-3"><StatusBadge status={inv.status} /></td>
         <td className="px-4 py-3">
           <div className="flex items-center justify-end gap-3 whitespace-nowrap">
-            {!cancelled && Number(inv.balance) > 0 && (
+            {!cancelled && balance > 0 && (
               <button onClick={onAddPayment} className="text-primary hover:text-primary-dark font-medium">+ Payment</button>
             )}
             <button onClick={onPdf} disabled={pdfBusy} className="text-text-muted hover:text-text-main disabled:opacity-50">
@@ -422,9 +499,19 @@ function FragmentRow({ inv, expanded, payments, onToggle, onAddPayment, onPdf, p
                 {payments.map((p) => (
                   <li key={p.id} className="flex flex-wrap items-center justify-between gap-2 text-sm bg-white rounded-lg px-3 py-2">
                     <span className="text-text-main font-medium">{formatPKR(p.amount)}</span>
-                    <span className="text-text-muted">{paymentMethodLabel(p.method)}</span>
+                    <span className="text-text-muted">{paymentMethodLabel(p.method || p.payment_method)}</span>
                     <span className="text-text-muted">{formatDateTime(p.payment_date || p.created_at)}</span>
                     <span className="text-text-muted">{p.received_by ? `by ${p.received_by}` : ''}</span>
+                    {!cancelled && onDeletePayment && (
+                      <button
+                        onClick={() => onDeletePayment(p)}
+                        title="Delete payment"
+                        aria-label="Delete payment"
+                        className="text-text-muted hover:text-accent"
+                      >
+                        <Icon name="🗑" className="w-4 h-4" />
+                      </button>
+                    )}
                   </li>
                 ))}
               </ul>
