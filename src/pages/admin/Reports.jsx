@@ -5,15 +5,15 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from 'recharts';
 import {
-  getDailyReport, getMonthlyReport, getYearlyReport, getOutstandingBalances,
-  downloadMonthlyReportPdf, downloadYearlyReportPdf, unwrapList,
+  getDailyReport, getWeeklyReport, getMonthlyReport, getYearlyReport, getOutstandingBalances,
+  downloadWeeklyReportPdf, downloadMonthlyReportPdf, downloadYearlyReportPdf, unwrapList,
 } from '../../api/admin';
 import StatCard from '../../components/admin/StatCard';
 import StatusBadge from '../../components/admin/StatusBadge';
 import EmptyState from '../../components/admin/EmptyState';
 import { CardsSkeleton, ChartSkeleton, BlockSkeleton } from '../../components/admin/Skeleton';
 import { formatPKR, formatAmount, formatDate, todayISO, MONTHS, MONTHS_SHORT } from '../../utils/format';
-import { paymentMethodLabel } from '../../utils/constants';
+import { paymentMethodLabel, expenseCategory } from '../../utils/constants';
 import { useChartTheme, SERIES } from '../../utils/chartTheme';
 
 const num = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
@@ -22,8 +22,28 @@ const PIE_COLORS = ['#00A6FF', '#22c55e', '#f97316', '#8b5cf6', '#eab308', '#FF6
 const [CUR_YEAR, CUR_MONTH] = todayISO().split('-').map(Number);
 const YEARS = Array.from({ length: 6 }, (_, i) => CUR_YEAR - i);
 
+// ── Week date helpers (UTC-anchored calendar math on YYYY-MM-DD strings) ─────
+function addDaysISO(dateStr, days) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  dt.setUTCDate(dt.getUTCDate() + days);
+  return dt.toISOString().slice(0, 10);
+}
+function mondayOfISO(dateStr) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const dow = new Date(Date.UTC(y, m - 1, d)).getUTCDay(); // 0=Sun..6=Sat
+  return addDaysISO(dateStr, dow === 0 ? -6 : 1 - dow);
+}
+const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+function shortDay(dateStr) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const dow = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+  return `${WEEKDAYS[dow]} ${d}`;
+}
+
 const TABS = [
   { key: 'daily', label: 'Daily' },
+  { key: 'weekly', label: 'Weekly' },
   { key: 'monthly', label: 'Monthly' },
   { key: 'yearly', label: 'Yearly' },
 ];
@@ -49,6 +69,7 @@ export default function Reports() {
       </div>
 
       {tab === 'daily' && <DailyTab />}
+      {tab === 'weekly' && <WeeklyTab />}
       {tab === 'monthly' && <MonthlyTab />}
       {tab === 'yearly' && <YearlyTab />}
     </div>
@@ -164,6 +185,180 @@ function DailyTab() {
                       <td className="px-4 py-3">
                         {a.invoice_status ? <StatusBadge status={a.invoice_status} /> : <span className="text-text-muted">—</span>}
                       </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// WEEKLY
+// ---------------------------------------------------------------------------
+function WeeklyTab() {
+  const [weekStart, setWeekStart] = useState(() => mondayOfISO(todayISO()));
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [pdfBusy, setPdfBusy] = useState(false);
+  const chart = useChartTheme();
+
+  const load = useCallback(() => {
+    setLoading(true);
+    getWeeklyReport(weekStart)
+      .then(setData)
+      .catch(() => { setData(null); toast.error('Failed to load weekly report'); })
+      .finally(() => setLoading(false));
+  }, [weekStart]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const revenue = num(data?.totalRevenue);
+  const expenses = num(data?.totalExpenses);
+  const net = data?.netProfit != null ? num(data.netProfit) : revenue - expenses;
+
+  const payments = unwrapList(data?.payment_items || data?.paymentItems || [], 'payment_items');
+  const expenseItems = unwrapList(data?.expense_items || data?.expenseItems || [], 'expense_items');
+  const daily = unwrapList(data?.daily || data?.daily_breakdown || [], 'daily')
+    .map((d) => ({ day: shortDay(d.date), revenue: num(d.revenue), expenses: num(d.expenses) }));
+
+  const periodLabel = data?.period_label || `${formatDate(weekStart)} – ${formatDate(addDaysISO(weekStart, 6))}`;
+  const isThisWeek = weekStart === mondayOfISO(todayISO());
+
+  const downloadPdf = async () => {
+    setPdfBusy(true);
+    try { await downloadWeeklyReportPdf(weekStart); }
+    catch { toast.error('Failed to download report PDF'); }
+    finally { setPdfBusy(false); }
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Week navigation */}
+      <div className="bg-white rounded-xl shadow-sm p-4 flex flex-wrap items-center gap-3">
+        <button onClick={() => setWeekStart((w) => addDaysISO(w, -7))} className="btn-outline !py-2 !px-3 text-sm" aria-label="Previous week">◀ Prev</button>
+        <button onClick={() => setWeekStart((w) => addDaysISO(w, 7))} disabled={isThisWeek} className="btn-outline !py-2 !px-3 text-sm disabled:opacity-40" aria-label="Next week">Next ▶</button>
+        <div className="flex items-center gap-2">
+          <label className="text-sm text-text-muted">Week of</label>
+          <input
+            type="date"
+            value={weekStart}
+            onChange={(e) => e.target.value && setWeekStart(mondayOfISO(e.target.value))}
+            className="input-field !w-auto"
+            max={todayISO()}
+          />
+        </div>
+        <span className="text-sm font-medium text-text-main">{periodLabel}</span>
+        <button onClick={downloadPdf} disabled={pdfBusy} className="btn-outline !py-2 !px-4 text-sm ml-auto disabled:opacity-50">
+          {pdfBusy ? 'Preparing...' : 'Download PDF'}
+        </button>
+      </div>
+
+      {loading ? (
+        <CardsSkeleton count={4} />
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          <StatCard label="Revenue" value={formatPKR(revenue)} icon="💰" color="bg-green-500" />
+          <StatCard label="Expenses" value={formatPKR(expenses)} icon="💸" color="bg-accent" />
+          <StatCard label="Net Profit" value={formatPKR(net)} icon="📈" color="bg-blue-500" tone={net >= 0 ? 'green' : 'red'} />
+          <StatCard label="New Patients" value={num(data?.newPatients)} icon="🧑" color="bg-purple-500" />
+        </div>
+      )}
+
+      {/* Daily trend */}
+      {loading ? <ChartSkeleton /> : (
+        <ChartCard title="Daily Revenue vs Expenses">
+          {daily.length === 0 ? (
+            <EmptyState icon="📈" title="No daily data" message="Daily revenue and expenses will appear here." />
+          ) : (
+            <div style={{ width: '100%', height: 280 }}>
+              <ResponsiveContainer>
+                <LineChart data={daily} margin={{ top: 4, right: 16, left: 8, bottom: 4 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke={chart.grid} />
+                  <XAxis dataKey="day" tick={{ fill: chart.axis, fontSize: 12 }} axisLine={{ stroke: chart.grid }} tickLine={false} />
+                  <YAxis tick={{ fill: chart.axis, fontSize: 12 }} tickFormatter={formatAmount} width={64} axisLine={{ stroke: chart.grid }} tickLine={false} />
+                  <Tooltip contentStyle={chart.tooltip} formatter={(value) => formatPKR(value)} />
+                  <Legend wrapperStyle={{ fontSize: 12 }} />
+                  <Line type="monotone" dataKey="revenue" name="Revenue" stroke={SERIES.revenue} strokeWidth={2} dot={false} />
+                  <Line type="monotone" dataKey="expenses" name="Expenses" stroke={SERIES.expenses} strokeWidth={2} dot={false} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </ChartCard>
+      )}
+
+      {/* Revenue — each payment received (who paid what) */}
+      {loading ? <BlockSkeleton lines={5} /> : (
+        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
+            <h3 className="font-semibold text-text-main">Revenue — Payments Received</h3>
+            <span className="text-sm font-semibold text-text-main">{formatPKR(revenue)}</span>
+          </div>
+          {payments.length === 0 ? (
+            <EmptyState icon="💰" title="No payments" message="Payments received this week will appear here." />
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-3 text-left font-medium text-text-muted">Date</th>
+                    <th className="px-4 py-3 text-left font-medium text-text-muted">Patient</th>
+                    <th className="px-4 py-3 text-left font-medium text-text-muted">Invoice #</th>
+                    <th className="px-4 py-3 text-left font-medium text-text-muted">Method</th>
+                    <th className="px-4 py-3 text-right font-medium text-text-muted">Amount</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {payments.map((p, i) => (
+                    <tr key={p.id ?? i} className="hover:bg-gray-50">
+                      <td className="px-4 py-3 text-text-main whitespace-nowrap">{formatDate(p.payment_date)}</td>
+                      <td className="px-4 py-3 text-text-main">{p.patient_name || '—'}</td>
+                      <td className="px-4 py-3 text-text-muted whitespace-nowrap">{p.invoice_number || '—'}</td>
+                      <td className="px-4 py-3 text-text-muted">{paymentMethodLabel(p.method)}</td>
+                      <td className="px-4 py-3 text-right text-text-main whitespace-nowrap">{formatPKR(p.amount)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Expenses — each expense line for the week */}
+      {loading ? <BlockSkeleton lines={4} /> : (
+        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
+            <h3 className="font-semibold text-text-main">Expenses</h3>
+            <span className="text-sm font-semibold text-text-main">{formatPKR(expenses)}</span>
+          </div>
+          {expenseItems.length === 0 ? (
+            <EmptyState icon="💸" title="No expenses" message="Expenses recorded this week will appear here." />
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-3 text-left font-medium text-text-muted">Date</th>
+                    <th className="px-4 py-3 text-left font-medium text-text-muted">Category</th>
+                    <th className="px-4 py-3 text-left font-medium text-text-muted">Description</th>
+                    <th className="px-4 py-3 text-left font-medium text-text-muted">Vendor</th>
+                    <th className="px-4 py-3 text-right font-medium text-text-muted">Amount</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {expenseItems.map((e, i) => (
+                    <tr key={e.id ?? i} className="hover:bg-gray-50">
+                      <td className="px-4 py-3 text-text-main whitespace-nowrap">{formatDate(e.expense_date)}</td>
+                      <td className="px-4 py-3 text-text-main">{expenseCategory(e.category).label}</td>
+                      <td className="px-4 py-3 text-text-main">{e.description || '—'}</td>
+                      <td className="px-4 py-3 text-text-muted">{e.vendor || '—'}</td>
+                      <td className="px-4 py-3 text-right text-text-main whitespace-nowrap">{formatPKR(e.amount)}</td>
                     </tr>
                   ))}
                 </tbody>

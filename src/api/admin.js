@@ -158,6 +158,11 @@ export function getDailyReport(date) {
   return client.get(`/api/admin/reports/daily${buildQuery({ date })}`).then((res) => res.data);
 }
 
+/** GET /api/admin/reports/weekly?start=YYYY-MM-DD — backend snaps to that week's Monday. */
+export function getWeeklyReport(start) {
+  return client.get(`/api/admin/reports/weekly${buildQuery({ start })}`).then((res) => res.data);
+}
+
 /** GET /api/admin/reports/monthly?year=&month= */
 export function getMonthlyReport(year, month) {
   return client.get(`/api/admin/reports/monthly${buildQuery({ year, month })}`).then((res) => res.data);
@@ -171,6 +176,15 @@ export function getYearlyReport(year) {
 /** GET /api/admin/reports/outstanding -> [{ patient_id, patient_name, phone, invoice_number, balance, days_overdue }] */
 export function getOutstandingBalances() {
   return client.get('/api/admin/reports/outstanding').then((res) => res.data);
+}
+
+/** GET /api/admin/reports/weekly/pdf?start=YYYY-MM-DD -> blob; downloads weekly-report-<weekStart>.pdf */
+export function downloadWeeklyReportPdf(start) {
+  return client
+    .get(`/api/admin/reports/weekly/pdf${buildQuery({ start })}`, { responseType: 'blob' })
+    .then((res) => {
+      downloadBlob(res.data, `weekly-report-${start}.pdf`);
+    });
 }
 
 /** GET /api/admin/reports/monthly/pdf?year=&month= -> blob; downloads monthly-report-YYYY-MM.pdf */

@@ -111,10 +111,11 @@ function SidebarBody({ onNavigate, isDark, toggleTheme, logout }) {
 }
 
 export default function AdminLayout() {
-  const { logout } = useAuth();
+  const { logout, mode } = useAuth();
   const { isDark, toggleTheme } = useTheme();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const title = usePageTitle();
+  const isTest = mode === 'test';
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -151,6 +152,15 @@ export default function AdminLayout() {
             </svg>
           </button>
           <h1 className="text-lg font-bold text-text-main">{title}</h1>
+          {isTest && (
+            <span
+              className="ml-auto inline-flex items-center gap-1.5 rounded-full bg-amber-100 text-amber-800 border border-amber-300 px-3 py-1 text-xs font-semibold"
+              title="You are logged in as the test admin. Entries here are isolated and do not affect live clinic data."
+            >
+              <span className="w-2 h-2 rounded-full bg-amber-500" />
+              TEST MODE — sandbox data
+            </span>
+          )}
         </header>
 
         <main className="flex-1">

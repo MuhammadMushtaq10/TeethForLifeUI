@@ -3,7 +3,7 @@ import { logout as logoutAction } from '../store/slices/authSlice';
 
 export function useAuth() {
   const dispatch = useDispatch();
-  const { token, loading, error } = useSelector((state) => state.auth);
+  const { token, mode, loading, error } = useSelector((state) => state.auth);
 
   const isAuthenticated = !!token;
 
@@ -11,5 +11,5 @@ export function useAuth() {
     dispatch(logoutAction());
   };
 
-  return { isAuthenticated, token, loading, error, logout };
+  return { isAuthenticated, token, mode, loading, error, logout };
 }
