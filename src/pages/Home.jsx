@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useLang } from '../context/LanguageContext';
 import client from '../api/client';
 import ReviewForm from '../components/ReviewForm';
+import logoImg from '../assets/teethforLife_LOGO.png';
 
 const serviceImages = {
   'General Checkup': '/images/general-checkup.jfif',
@@ -157,14 +158,13 @@ export default function Home() {
               <div className="relative w-full max-w-md">
                 <div className="w-full aspect-square rounded-3xl overflow-hidden bg-gradient-to-br from-primary/10 to-primary/5">
                   <img
-                    src="/images/hero-dental.jpg"
-                    alt="Teeth For Life dental clinic"
-                    className="w-full h-full object-cover"
-                    onError={(e) => { e.target.style.display = 'none'; }}
+                    src={logoImg}
+                    alt="Teeth For Life Dental Clinic"
+                    className="w-full h-full object-cover mix-blend-multiply"
                   />
                 </div>
                 {/* Floating card */}
-                <div className="absolute -bottom-4 -left-4 bg-white rounded-2xl shadow-lg p-4 flex items-center gap-3">
+                <div className="absolute -bottom-10 -left-4 bg-white rounded-2xl shadow-lg p-4 flex items-center gap-3">
                   <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
                     <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />

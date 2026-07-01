@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useLang } from '../context/LanguageContext';
 import { useTheme } from '../context/ThemeContext';
+import iconImg from '../assets/teethForLife_ICON.png';
 
 function ThemeToggle({ isDark, toggleTheme, className = '' }) {
   return (
@@ -48,9 +49,11 @@ export default function Navbar() {
         <div className="flex items-center justify-between h-[72px]">
           {/* Logo */}
           <Link to="/" className="flex items-center gap-2.5">
-            <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center">
-              <span className="text-white font-bold text-sm">TF</span>
-            </div>
+            <img
+              src={iconImg}
+              alt="Teeth For Life"
+              className="w-11 h-11 object-contain mix-blend-multiply"
+            />
             <span className="text-[22px] font-bold text-text-main tracking-tight">Teeth For Life</span>
           </Link>
 
