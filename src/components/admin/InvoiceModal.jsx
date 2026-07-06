@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import toast from 'react-hot-toast';
 import Modal from './Modal';
-import { createInvoice, updateInvoice, getInvoice, updatePatient, getPatientAppointments, getServices, unwrapList } from '../../api/admin';
-import { formatPKR, formatDate, toDateInput } from '../../utils/format';
+import { createInvoice, updateInvoice, getInvoice, updatePatient, createTreatment, createAppointment, getPatientAppointments, getServices, unwrapList } from '../../api/admin';
+import { formatPKR, formatDate, toDateInput, todayISO } from '../../utils/format';
 
 // Pakistani phone, matching the backend regex exactly.
 const PHONE_RE = /^(\+92|0)[0-9]{10}$/;
@@ -81,6 +81,11 @@ export default function InvoiceModal({ isOpen, onClose, patientId, invoice, onSu
       discount_reason: '',
       notes: '',
       invoice_date: '',
+      // Treatment (optional) — a single free-text detail, recorded to history.
+      treatment_notes: '',
+      // Next appointment (optional) — books a real CONFIRMED follow-up.
+      next_appointment_date: '',
+      next_appointment_time: '',
     });
     setLoadingData(true);
     const tasks = [getServices().catch(() => [])];
@@ -144,7 +149,51 @@ export default function InvoiceModal({ isOpen, onClose, patientId, invoice, onSu
       }
 
       const created = await createInvoice(payload);
-      toast.success('Invoice created');
+      const patient = created?.invoice?.patient || null;
+
+      // Optional extras attached to this visit. These are secondary — a failure
+      // here must not lose the invoice, so each is caught and surfaced as a warning.
+      const extras = [];
+      const failures = [];
+
+      const treatmentText = (data.treatment_notes || '').trim();
+      if (treatmentText) {
+        if (patient?.id) {
+          try {
+            await createTreatment({
+              patient_id: patient.id,
+              treatment_date: todayISO(),
+              treatment_notes: treatmentText,
+            });
+            extras.push('treatment');
+          } catch {
+            failures.push('treatment');
+          }
+        } else {
+          failures.push('treatment');
+        }
+      }
+
+      if (data.next_appointment_date) {
+        if (patient?.phone) {
+          try {
+            await createAppointment({
+              full_name: patient.full_name,
+              phone: patient.phone,
+              appointment_date: data.next_appointment_date,
+              appointment_time: data.next_appointment_time,
+            });
+            extras.push('next appointment');
+          } catch (e) {
+            failures.push(e.response?.status === 409 ? 'next appointment (slot already booked)' : 'next appointment');
+          }
+        } else {
+          failures.push('next appointment');
+        }
+      }
+
+      toast.success(`Invoice created${extras.length ? ` + ${extras.join(' + ')}` : ''}`);
+      if (failures.length) toast.error(`Couldn't save: ${failures.join(', ')}`);
       onSuccess?.(created);
       onClose();
     } catch (err) {
@@ -292,6 +341,48 @@ export default function InvoiceModal({ isOpen, onClose, patientId, invoice, onSu
           <label className="block text-sm font-medium text-text-main mb-1">Notes</label>
           <textarea {...register('notes')} rows={2} className="input-field" placeholder="Optional notes..." />
         </div>
+
+        {!isEdit && (
+          <>
+            {/* Treatment (optional) — a single free-text detail saved to history. */}
+            <div className="border-t border-gray-100 pt-4">
+              <label className="block text-sm font-semibold text-text-main mb-1">
+                Treatment <span className="text-text-muted font-normal">(optional)</span>
+              </label>
+              <textarea
+                {...register('treatment_notes')}
+                rows={2}
+                className="input-field"
+                placeholder="What was done at this visit — saved to the patient’s treatment history."
+              />
+            </div>
+
+            {/* Next appointment (optional) — books a real CONFIRMED follow-up. */}
+            <div className="border-t border-gray-100 pt-4">
+              <label className="block text-sm font-semibold text-text-main mb-1">
+                Next Appointment <span className="text-text-muted font-normal">(optional)</span>
+              </label>
+              <p className="text-text-muted text-xs mb-2">Pick a date to book a confirmed follow-up (appears in Appointments, WhatsApp reminders included).</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-text-main mb-1">Date</label>
+                  <input type="date" {...register('next_appointment_date')} className="input-field" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-text-main mb-1">Time</label>
+                  <input
+                    type="time"
+                    {...register('next_appointment_time', {
+                      validate: (v, fv) => !fv.next_appointment_date || !!v || 'Pick a time for the next appointment',
+                    })}
+                    className="input-field"
+                  />
+                  {errors.next_appointment_time && <p className="text-accent text-sm mt-1">{errors.next_appointment_time.message}</p>}
+                </div>
+              </div>
+            </div>
+          </>
+        )}
 
         <div className="flex justify-between items-center bg-gray-50 rounded-lg px-4 py-3">
           <span className="text-text-muted text-sm">Invoice total</span>

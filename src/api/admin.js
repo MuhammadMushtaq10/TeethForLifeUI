@@ -236,6 +236,11 @@ export function updatePatient(id, data) {
   return client.patch(`/api/admin/patients/${id}`, data).then((res) => res.data);
 }
 
+/** POST /api/admin/appointments — admin manual booking (forces status CONFIRMED / source MANUAL). Body: { full_name, phone, email?, service_id, appointment_date, appointment_time, notes?, date_of_birth? } */
+export function createAppointment(data) {
+  return client.post('/api/admin/appointments', data).then((res) => res.data);
+}
+
 /** GET /api/admin/appointments?patient_id=&status= -> appointments for a patient (used in dropdowns) */
 export function getPatientAppointments(patientId, filters = {}) {
   return client
