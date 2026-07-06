@@ -2,23 +2,26 @@ import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import toast from 'react-hot-toast';
 import Modal from './Modal';
-import { createInvoice, getPatientAppointments, getServices, unwrapList } from '../../api/admin';
-import { formatPKR, formatDate } from '../../utils/format';
+import { createInvoice, updateInvoice, getInvoice, updatePatient, getPatientAppointments, getServices, unwrapList } from '../../api/admin';
+import { formatPKR, formatDate, toDateInput } from '../../utils/format';
 
 // Pakistani phone, matching the backend regex exactly.
 const PHONE_RE = /^(\+92|0)[0-9]{10}$/;
 
-// Create an invoice.
-//  - Billing page (no `patientId`): identify the patient by NAME + PHONE. The
-//    backend upserts the patient by phone (the app's canonical identity), so an
-//    appointment is NOT required — walk-ins can be invoiced directly.
-//  - Patient profile (`patientId` provided): the patient is already known; we
-//    send `patient_id` and offer an optional appointment to link/prefill price.
-export default function InvoiceModal({ isOpen, onClose, patientId, onSuccess }) {
+// Create OR edit an invoice.
+//  - Create, Billing page (no `patientId`): identify the patient by NAME + PHONE.
+//    The backend upserts the patient by phone, so an appointment is NOT required.
+//  - Create, Patient profile (`patientId`): patient known; optional appointment link.
+//  - Edit (`invoice` provided): the patient/appointment are fixed; the admin can
+//    correct the amounts, discount, notes and the invoice DATE (created_at).
+export default function InvoiceModal({ isOpen, onClose, patientId, invoice, onSuccess }) {
+  const isEdit = !!invoice;
   const scoped = !!patientId; // profile context — patient already known
   const [appointments, setAppointments] = useState([]);
   const [services, setServices] = useState([]);
   const [loadingData, setLoadingData] = useState(false);
+  // In edit mode, the linked patient so we can also fix their name/phone here.
+  const [patientInfo, setPatientInfo] = useState(null);
 
   const {
     register,
@@ -35,6 +38,39 @@ export default function InvoiceModal({ isOpen, onClose, patientId, onSuccess }) 
 
   useEffect(() => {
     if (!isOpen) return;
+
+    // Edit mode: prefill from the row immediately, then hydrate from the full
+    // invoice (list rows omit discount_reason/notes) so nothing is hidden.
+    if (isEdit) {
+      const prefill = (inv, patient) => reset({
+        full_name: '',
+        phone: '',
+        appointment_id: '',
+        service_id: '',
+        subtotal: inv.subtotal ?? inv.total ?? '',
+        discount_amount: inv.discount_amount ?? '',
+        discount_reason: inv.discount_reason || '',
+        notes: inv.notes || '',
+        invoice_date: toDateInput(inv.created_at || inv.invoice_date),
+        patient_name: patient?.full_name ?? inv.patient_name ?? '',
+        patient_phone: patient?.phone ?? inv.patient_phone ?? '',
+      });
+      const initialPatient = invoice.patient_id
+        ? { id: invoice.patient_id, full_name: invoice.patient_name, phone: invoice.patient_phone }
+        : null;
+      setPatientInfo(initialPatient);
+      prefill(invoice, initialPatient);
+      getInvoice(invoice.id)
+        .then((full) => {
+          if (!full) return;
+          const p = full.patient || initialPatient;
+          setPatientInfo(p);
+          prefill({ ...invoice, ...full }, p);
+        })
+        .catch(() => {});
+      return;
+    }
+
     reset({
       full_name: '',
       phone: '',
@@ -44,6 +80,7 @@ export default function InvoiceModal({ isOpen, onClose, patientId, onSuccess }) 
       discount_amount: '',
       discount_reason: '',
       notes: '',
+      invoice_date: '',
     });
     setLoadingData(true);
     const tasks = [getServices().catch(() => [])];
@@ -54,7 +91,7 @@ export default function InvoiceModal({ isOpen, onClose, patientId, onSuccess }) 
         setAppointments(scoped ? unwrapList(res[1], 'appointments', 'data') : []);
       })
       .finally(() => setLoadingData(false));
-  }, [isOpen, patientId, scoped, reset]);
+  }, [isOpen, patientId, scoped, isEdit, invoice, reset]);
 
   // Prefill subtotal from the matching service price when an appointment is picked.
   const onAppointmentChange = (e) => {
@@ -66,6 +103,32 @@ export default function InvoiceModal({ isOpen, onClose, patientId, onSuccess }) 
 
   const onSubmit = async (data) => {
     try {
+      if (isEdit) {
+        // If the linked patient's name/phone was corrected, save that first — it
+        // updates the patient record everywhere they're referenced.
+        const pid = patientInfo?.id || invoice.patient_id;
+        const newName = (data.patient_name || '').trim();
+        const newPhone = (data.patient_phone || '').trim();
+        const nameChanged = newName && newName !== (patientInfo?.full_name || '');
+        const phoneChanged = newPhone && newPhone !== (patientInfo?.phone || '');
+        if (pid && (nameChanged || phoneChanged)) {
+          await updatePatient(pid, { full_name: newName, phone: newPhone });
+        }
+
+        const payload = {
+          subtotal: Number(data.subtotal),
+          discount_amount: Number(data.discount_amount) || 0,
+          discount_reason: data.discount_reason || undefined,
+          notes: data.notes || undefined,
+          invoice_date: data.invoice_date || undefined,
+        };
+        const updated = await updateInvoice(invoice.id, payload);
+        toast.success('Invoice updated');
+        onSuccess?.(updated);
+        onClose();
+        return;
+      }
+
       const payload = {
         subtotal: Number(data.subtotal),
         discount_amount: Number(data.discount_amount) || 0,
@@ -80,23 +143,62 @@ export default function InvoiceModal({ isOpen, onClose, patientId, onSuccess }) 
         payload.phone = data.phone.trim();
       }
 
-      const invoice = await createInvoice(payload);
+      const created = await createInvoice(payload);
       toast.success('Invoice created');
-      onSuccess?.(invoice);
+      onSuccess?.(created);
       onClose();
     } catch (err) {
       const apiErr =
         err.response?.data?.error ||
         err.response?.data?.errors?.[0]?.message ||
-        'Failed to create invoice';
+        (isEdit ? 'Failed to update invoice' : 'Failed to create invoice');
       toast.error(apiErr);
     }
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Create Invoice" size="lg">
+    <Modal isOpen={isOpen} onClose={onClose} title={isEdit ? 'Edit Invoice' : 'Create Invoice'} size="lg">
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-        {scoped ? (
+        {isEdit ? (
+          <>
+            <div className="bg-gray-50 rounded-lg p-3 text-sm">
+              <div className="flex justify-between">
+                <span className="text-text-muted">Invoice</span>
+                <span className="font-medium text-text-main">{invoice.invoice_number || `#${invoice.id}`}</span>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-text-main mb-1">Patient Name</label>
+                <input
+                  {...register('patient_name', {
+                    validate: (v) => !v || v.trim().length >= 2 || 'At least 2 characters',
+                  })}
+                  className="input-field"
+                  placeholder="Patient name"
+                />
+                {errors.patient_name && <p className="text-accent text-sm mt-1">{errors.patient_name.message}</p>}
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-text-main mb-1">Phone</label>
+                <input
+                  {...register('patient_phone', {
+                    validate: (v) => !v || PHONE_RE.test(v) || 'Use +92XXXXXXXXXX or 0XXXXXXXXXX',
+                  })}
+                  className="input-field"
+                  placeholder="03XXXXXXXXX or +92XXXXXXXXXX"
+                />
+                {errors.patient_phone && <p className="text-accent text-sm mt-1">{errors.patient_phone.message}</p>}
+              </div>
+            </div>
+            <p className="text-text-muted text-xs -mt-2">Fixing the name or phone updates the patient’s record everywhere.</p>
+            <div>
+              <label className="block text-sm font-medium text-text-main mb-1">Invoice Date</label>
+              <input type="date" {...register('invoice_date')} className="input-field" />
+              <p className="text-text-muted text-xs mt-1">The date shown on the invoice — change it to correct a back-dated entry.</p>
+            </div>
+          </>
+        ) : scoped ? (
           <div>
             <label className="block text-sm font-medium text-text-main mb-1">Appointment (optional)</label>
             <select
@@ -199,7 +301,7 @@ export default function InvoiceModal({ isOpen, onClose, patientId, onSuccess }) 
         <div className="flex gap-3 pt-2">
           <button type="button" onClick={onClose} className="flex-1 btn-outline !py-2">Cancel</button>
           <button type="submit" disabled={isSubmitting} className="flex-1 btn-primary !py-2 disabled:opacity-50">
-            {isSubmitting ? 'Creating...' : 'Create Invoice'}
+            {isSubmitting ? 'Saving...' : isEdit ? 'Save Changes' : 'Create Invoice'}
           </button>
         </div>
       </form>

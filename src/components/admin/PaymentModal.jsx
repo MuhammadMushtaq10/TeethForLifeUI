@@ -2,13 +2,15 @@ import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import toast from 'react-hot-toast';
 import Modal from './Modal';
-import { addPayment } from '../../api/admin';
+import { addPayment, updatePayment } from '../../api/admin';
 import { PAYMENT_METHODS } from '../../utils/constants';
 import { formatPKR, todayISO } from '../../utils/format';
 
-// Record a payment against an invoice. Reused by Billing, Patient profile and the
-// Appointments POS flow.
-export default function PaymentModal({ isOpen, onClose, invoice, onSuccess }) {
+// Record OR edit a payment against an invoice. Reused by Billing, Patient profile
+// and the Appointments POS flow. Pass a `payment` to edit an existing one; omit it
+// to record a new payment.
+export default function PaymentModal({ isOpen, onClose, invoice, payment, onSuccess }) {
+  const isEdit = !!payment;
   const {
     register,
     handleSubmit,
@@ -19,7 +21,16 @@ export default function PaymentModal({ isOpen, onClose, invoice, onSuccess }) {
   const balance = Number(invoice?.balance ?? invoice?.balance_due ?? 0);
 
   useEffect(() => {
-    if (isOpen) {
+    if (!isOpen) return;
+    if (isEdit) {
+      reset({
+        amount: payment.amount ?? '',
+        method: payment.payment_method || payment.method || 'CASH',
+        payment_date: payment.payment_date || todayISO(),
+        received_by: payment.received_by || '',
+        notes: payment.notes || '',
+      });
+    } else {
       reset({
         amount: balance > 0 ? balance : '',
         method: 'CASH',
@@ -28,29 +39,35 @@ export default function PaymentModal({ isOpen, onClose, invoice, onSuccess }) {
         notes: '',
       });
     }
-  }, [isOpen, balance, reset]);
+  }, [isOpen, isEdit, payment, balance, reset]);
 
   const onSubmit = async (data) => {
+    const body = {
+      amount: Number(data.amount),
+      payment_method: data.method,
+      payment_date: data.payment_date,
+      received_by: data.received_by || undefined,
+      notes: data.notes || undefined,
+    };
     try {
-      await addPayment(invoice.id, {
-        amount: Number(data.amount),
-        payment_method: data.method,
-        payment_date: data.payment_date,
-        received_by: data.received_by || undefined,
-        notes: data.notes || undefined,
-      });
-      toast.success('Payment recorded');
+      if (isEdit) {
+        await updatePayment(invoice.id, payment.id, body);
+        toast.success('Payment updated');
+      } else {
+        await addPayment(invoice.id, body);
+        toast.success('Payment recorded');
+      }
       onSuccess?.();
       onClose();
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed to record payment');
+      toast.error(err.response?.data?.error || (isEdit ? 'Failed to update payment' : 'Failed to record payment'));
     }
   };
 
   if (!invoice) return null;
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Add Payment" size="md">
+    <Modal isOpen={isOpen} onClose={onClose} title={isEdit ? 'Edit Payment' : 'Add Payment'} size="md">
       <div className="bg-gray-50 rounded-lg p-3 mb-5 text-sm">
         <div className="flex justify-between">
           <span className="text-text-muted">Invoice</span>
@@ -79,7 +96,9 @@ export default function PaymentModal({ isOpen, onClose, invoice, onSuccess }) {
               required: 'Amount is required',
               valueAsNumber: true,
               min: { value: 1, message: 'Amount must be greater than 0' },
-              max: balance > 0 ? { value: balance, message: `Cannot exceed balance of ${formatPKR(balance)}` } : undefined,
+              // When editing, don't cap at the current balance — the admin is correcting
+              // a mistake and the backend re-derives the invoice status afterwards.
+              max: !isEdit && balance > 0 ? { value: balance, message: `Cannot exceed balance of ${formatPKR(balance)}` } : undefined,
             })}
             className="input-field"
             placeholder="0"
@@ -115,7 +134,7 @@ export default function PaymentModal({ isOpen, onClose, invoice, onSuccess }) {
         <div className="flex gap-3 pt-2">
           <button type="button" onClick={onClose} className="flex-1 btn-outline !py-2">Cancel</button>
           <button type="submit" disabled={isSubmitting} className="flex-1 btn-primary !py-2 disabled:opacity-50">
-            {isSubmitting ? 'Saving...' : 'Record Payment'}
+            {isSubmitting ? 'Saving...' : isEdit ? 'Save Changes' : 'Record Payment'}
           </button>
         </div>
       </form>

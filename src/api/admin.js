@@ -58,14 +58,19 @@ export function getInvoice(id) {
   return client.get(`/api/admin/invoices/${id}`).then((res) => res.data);
 }
 
-/** PATCH /api/admin/invoices/:id — body: { subtotal?, discount_amount?, discount_reason?, notes? } */
+/** PATCH /api/admin/invoices/:id — body: { subtotal?, discount_amount?, discount_reason?, notes?, invoice_date? } */
 export function updateInvoice(id, data) {
   return client.patch(`/api/admin/invoices/${id}`, data).then((res) => res.data);
 }
 
-/** POST /api/admin/invoices/:id/payments — body: { amount, method, payment_date, received_by, notes } */
+/** POST /api/admin/invoices/:id/payments — body: { amount, payment_method, payment_date, received_by, notes } */
 export function addPayment(invoiceId, data) {
   return client.post(`/api/admin/invoices/${invoiceId}/payments`, data).then((res) => res.data);
+}
+
+/** PATCH /api/admin/invoices/:invoiceId/payments/:paymentId — edit a recorded payment (amount/method/date/...). Backend re-derives the invoice's paid/unpaid status. */
+export function updatePayment(invoiceId, paymentId, data) {
+  return client.patch(`/api/admin/invoices/${invoiceId}/payments/${paymentId}`, data).then((res) => res.data);
 }
 
 /** DELETE /api/admin/invoices/:id/cancel -> updated invoice (status CANCELLED) */
@@ -226,6 +231,11 @@ export function getPatient(id) {
   return client.get(`/api/admin/patients/${id}`).then((res) => res.data);
 }
 
+/** PATCH /api/admin/patients/:id — correct patient details ({ full_name?, phone?, email?, date_of_birth? }). 409 if the phone belongs to another patient. */
+export function updatePatient(id, data) {
+  return client.patch(`/api/admin/patients/${id}`, data).then((res) => res.data);
+}
+
 /** GET /api/admin/appointments?patient_id=&status= -> appointments for a patient (used in dropdowns) */
 export function getPatientAppointments(patientId, filters = {}) {
   return client
@@ -245,6 +255,17 @@ export function getAppointmentInvoice(appointmentId) {
  */
 export function deleteAppointment(id, { force = false } = {}) {
   return client.delete(`/api/admin/appointments/${id}${force ? '?force=true' : ''}`).then((res) => res.data);
+}
+
+/**
+ * PATCH /api/admin/appointments/:id — update an appointment. Body may include
+ * { status?, notes?, showed_up?, appointment_date?, appointment_time?, service_id? }.
+ * The backend allows backdating here (no future/Sunday restriction) so admins can
+ * correct or reschedule an entry. Replies 409 (`SLOT_TAKEN`) if the new date/time
+ * collides with another active appointment.
+ */
+export function updateAppointment(id, data) {
+  return client.patch(`/api/admin/appointments/${id}`, data).then((res) => res.data);
 }
 
 /** GET /api/services -> service catalogue (shared with public site). */

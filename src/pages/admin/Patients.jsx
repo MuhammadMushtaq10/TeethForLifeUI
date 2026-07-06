@@ -4,6 +4,8 @@ import toast from 'react-hot-toast';
 import client from '../../api/client';
 import { TableSkeleton } from '../../components/admin/Skeleton';
 import EmptyState from '../../components/admin/EmptyState';
+import Icon from '../../components/admin/Icon';
+import PatientModal from '../../components/admin/PatientModal';
 import { formatDate } from '../../utils/format';
 
 export default function Patients() {
@@ -11,6 +13,7 @@ export default function Patients() {
   const [patients, setPatients] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [editPatient, setEditPatient] = useState(null);
 
   const fetchPatients = (query = '') => {
     setLoading(true);
@@ -74,6 +77,7 @@ export default function Patients() {
                   <th className="px-6 py-3 text-left font-medium text-text-muted">Email</th>
                   <th className="px-6 py-3 text-left font-medium text-text-muted">Date of Birth</th>
                   <th className="px-6 py-3 text-left font-medium text-text-muted">Registered</th>
+                  <th className="px-6 py-3 text-right font-medium text-text-muted">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -88,6 +92,18 @@ export default function Patients() {
                     <td className="px-6 py-4 text-text-muted">{patient.email || '—'}</td>
                     <td className="px-6 py-4 text-text-muted">{patient.date_of_birth ? formatDate(patient.date_of_birth) : '—'}</td>
                     <td className="px-6 py-4 text-text-muted whitespace-nowrap">{formatDate(patient.created_at)}</td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center justify-end">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setEditPatient(patient); }}
+                          title="Edit patient"
+                          aria-label="Edit patient"
+                          className="text-text-muted hover:text-primary"
+                        >
+                          <Icon name="✏" className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -98,6 +114,13 @@ export default function Patients() {
           </div>
         </div>
       )}
+
+      <PatientModal
+        isOpen={!!editPatient}
+        patient={editPatient}
+        onClose={() => setEditPatient(null)}
+        onSuccess={() => fetchPatients(search)}
+      />
     </div>
   );
 }

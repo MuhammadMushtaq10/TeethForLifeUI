@@ -5,6 +5,11 @@ import client from '../api/client';
 import ReviewForm from '../components/ReviewForm';
 import logoImg from '../assets/teethforLife_LOGO.png';
 
+// Map the service catalogue to its photo. Services without a photo yet fall back
+// to a placeholder. The backend may also supply a per-service `image_url`, which
+// takes precedence (see serviceImage below) — that's how new photos get wired
+// without touching this file.
+const SERVICE_PLACEHOLDER = '/images/service-placeholder.svg';
 const serviceImages = {
   'General Checkup': '/images/general-checkup.jfif',
   'Teeth Cleaning': '/images/scaling.jfif',
@@ -14,7 +19,16 @@ const serviceImages = {
   'Braces Consultation': '/images/braces.jfif',
   'Kids Dentistry': '/images/kids-dentistry.jfif',
   'Tooth Extraction': '/images/extraction.jfif',
+  'Tooth Filling (Upper)': '/images/tooth-filling-upper.jpg',
+  'Tooth Filling (Lower)': '/images/tooth-filling-lower.jpg',
+  'Dental Bridges': '/images/dental-bridges.jpg',
+  'Dentures (Acrylic)': '/images/dentures-acrylic.jpg',
+  'Cast Partial Denture': '/images/cast-partial-denture.jpg',
+  'Flexible Denture': '/images/flexible-denture.jpg',
 };
+function serviceImage(service) {
+  return service?.image_url || serviceImages[service?.name] || SERVICE_PLACEHOLDER;
+}
 
 const whyFeatures = [
   {
@@ -200,8 +214,9 @@ export default function Home() {
               >
                 <div className="h-40 overflow-hidden bg-primary-light">
                   <img
-                    src={serviceImages[service.name]}
+                    src={serviceImage(service)}
                     alt={service.name}
+                    onError={(e) => { e.currentTarget.src = SERVICE_PLACEHOLDER; }}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                   />
                 </div>

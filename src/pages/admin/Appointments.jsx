@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import AppointmentModal from '../../components/AppointmentModal';
+import AppointmentEditModal from '../../components/admin/AppointmentEditModal';
 import PaymentModal from '../../components/admin/PaymentModal';
 import StatusBadge from '../../components/admin/StatusBadge';
 import { TableSkeleton } from '../../components/admin/Skeleton';
@@ -16,6 +17,7 @@ export default function Appointments() {
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
+  const [editAppointment, setEditAppointment] = useState(null);
   const [paymentInvoice, setPaymentInvoice] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
@@ -210,7 +212,15 @@ export default function Appointments() {
                     </td>
                     <td className="px-4 py-3 text-text-muted text-xs max-w-[150px] truncate">{apt.notes || '—'}</td>
                     <td className="px-4 py-3">
-                      <div className="flex items-center justify-end">
+                      <div className="flex items-center justify-end gap-3">
+                        <button
+                          onClick={() => setEditAppointment(apt)}
+                          title="Edit appointment"
+                          aria-label="Edit appointment"
+                          className="text-text-muted hover:text-primary"
+                        >
+                          <Icon name="✏" className="w-4 h-4" />
+                        </button>
                         <button
                           onClick={() => openDelete(apt)}
                           title="Delete appointment"
@@ -230,6 +240,12 @@ export default function Appointments() {
       )}
 
       <AppointmentModal isOpen={modalOpen} onClose={() => setModalOpen(false)} onSuccess={fetchAppointments} />
+      <AppointmentEditModal
+        isOpen={!!editAppointment}
+        appointment={editAppointment}
+        onClose={() => setEditAppointment(null)}
+        onSuccess={fetchAppointments}
+      />
       <PaymentModal
         isOpen={!!paymentInvoice}
         invoice={paymentInvoice}

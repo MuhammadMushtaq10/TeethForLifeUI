@@ -3,6 +3,9 @@ import { Link } from 'react-router-dom';
 import { useLang } from '../context/LanguageContext';
 import client from '../api/client';
 
+// Photos keyed by service name. Services without a photo yet fall back to a
+// placeholder; a backend-supplied `image_url` (once set) takes precedence.
+const SERVICE_PLACEHOLDER = '/images/service-placeholder.svg';
 const serviceImages = {
   'General Checkup': '/images/general-checkup.jfif',
   'Teeth Cleaning': '/images/scaling.jfif',
@@ -12,9 +15,19 @@ const serviceImages = {
   'Braces Consultation': '/images/braces.jfif',
   'Kids Dentistry': '/images/kids-dentistry.jfif',
   'Tooth Extraction': '/images/extraction.jfif',
+  'Tooth Filling (Upper)': '/images/tooth-filling-upper.jpg',
+  'Tooth Filling (Lower)': '/images/tooth-filling-lower.jpg',
+  'Dental Bridges': '/images/dental-bridges.jpg',
+  'Dentures (Acrylic)': '/images/dentures-acrylic.jpg',
+  'Cast Partial Denture': '/images/cast-partial-denture.jpg',
+  'Flexible Denture': '/images/flexible-denture.jpg',
 };
+function serviceImage(service) {
+  return service?.image_url || serviceImages[service?.name] || SERVICE_PLACEHOLDER;
+}
 
 const serviceDetails = {
+  // Existing catalogue — unchanged.
   'General Checkup': {
     steps: ['Comprehensive oral examination', 'Digital X-rays if needed', 'Gum health assessment', 'Oral cancer screening', 'Personalized treatment plan'],
   },
@@ -38,6 +51,25 @@ const serviceDetails = {
   },
   'Tooth Extraction': {
     steps: ['X-ray & assessment', 'Local anesthesia administration', 'Careful tooth extraction', 'Socket preservation if needed', 'Aftercare instructions & follow-up'],
+  },
+  // Newly-added services.
+  'Tooth Filling (Upper)': {
+    steps: ['Decay assessment & X-ray if needed', 'Local anaesthesia for comfort', 'Careful removal of decay', 'Tooth-coloured composite filling placed', 'Bite check & polishing'],
+  },
+  'Tooth Filling (Lower)': {
+    steps: ['Decay assessment & X-ray if needed', 'Local anaesthesia for comfort', 'Careful removal of decay', 'Tooth-coloured composite filling placed', 'Bite check & polishing'],
+  },
+  'Dental Bridges': {
+    steps: ['Assessment & impressions', 'Preparation of the supporting teeth', 'Temporary bridge fitted', 'Custom bridge fabrication', 'Final bridge cemented & bite adjusted'],
+  },
+  'Dentures (Acrylic)': {
+    steps: ['Impressions & bite registration', 'Try-in of the denture set-up', 'Final acrylic denture fabrication', 'Fitting & adjustments', 'Care & maintenance guidance'],
+  },
+  'Cast Partial Denture': {
+    steps: ['Impressions & framework design', 'Metal framework try-in', 'Tooth arrangement & try-in', 'Final fitting & adjustments', 'Care & maintenance guidance'],
+  },
+  'Flexible Denture': {
+    steps: ['Impressions & bite registration', 'Flexible denture fabrication', 'Comfortable metal-free fitting', 'Adjustments for a snug fit', 'Care & maintenance guidance'],
   },
 };
 
@@ -73,7 +105,7 @@ export default function Services() {
           {services.map((service) => {
             const details = serviceDetails[service.name];
             const isExpanded = expandedId === service.id;
-            const image = serviceImages[service.name];
+            const image = serviceImage(service);
 
             return (
               <div key={service.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden transition-all duration-300">
@@ -88,6 +120,7 @@ export default function Services() {
                       <img
                         src={image}
                         alt={service.name}
+                        onError={(e) => { e.currentTarget.src = SERVICE_PLACEHOLDER; }}
                         className="w-full h-full object-cover min-h-[140px]"
                       />
                     </div>

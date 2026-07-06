@@ -31,6 +31,7 @@ export default function Billing() {
   const [page, setPage] = useState(1);
 
   const [invoiceModalOpen, setInvoiceModalOpen] = useState(false);
+  const [editInvoice, setEditInvoice] = useState(null);
   const [paymentInvoice, setPaymentInvoice] = useState(null);
   const [cancelTarget, setCancelTarget] = useState(null);
   const [cancelBusy, setCancelBusy] = useState(false);
@@ -240,6 +241,7 @@ export default function Billing() {
                 {rows.map((inv) => {
                   const cancellable = inv.status !== 'CANCELLED' && inv.status !== 'PAID';
                   const payable = inv.status !== 'CANCELLED' && num(inv.balance) > 0;
+                  const editable = inv.status !== 'CANCELLED';
                   return (
                     <tr key={inv.id} className="hover:bg-gray-50">
                       <td className="px-4 py-3 font-medium text-text-main whitespace-nowrap">
@@ -269,12 +271,28 @@ export default function Billing() {
                           {payable && (
                             <button onClick={() => setPaymentInvoice(inv)} className="text-primary hover:text-primary-dark">Payment</button>
                           )}
-                          <button onClick={() => handlePdf(inv)} disabled={pdfBusyId === inv.id} className="text-text-muted hover:text-text-main disabled:opacity-50">
-                            {pdfBusyId === inv.id ? '...' : 'PDF'}
-                          </button>
                           {cancellable && (
                             <button onClick={() => setCancelTarget(inv)} className="text-accent hover:text-red-700">Cancel</button>
                           )}
+                          {editable && (
+                            <button
+                              onClick={() => setEditInvoice(inv)}
+                              title="Edit invoice"
+                              aria-label="Edit invoice"
+                              className="text-text-muted hover:text-primary"
+                            >
+                              <Icon name="✏" className="w-4 h-4" />
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handlePdf(inv)}
+                            disabled={pdfBusyId === inv.id}
+                            title="Download PDF"
+                            aria-label="Download PDF"
+                            className="text-text-muted hover:text-text-main disabled:opacity-50"
+                          >
+                            {pdfBusyId === inv.id ? '...' : <Icon name="⬇" className="w-4 h-4" />}
+                          </button>
                           <button
                             onClick={() => openDelete(inv)}
                             title="Delete invoice"
@@ -320,6 +338,12 @@ export default function Billing() {
 
       {/* Modals */}
       <InvoiceModal isOpen={invoiceModalOpen} onClose={() => setInvoiceModalOpen(false)} onSuccess={fetchInvoices} />
+      <InvoiceModal
+        isOpen={!!editInvoice}
+        invoice={editInvoice}
+        onClose={() => setEditInvoice(null)}
+        onSuccess={fetchInvoices}
+      />
       <PaymentModal
         isOpen={!!paymentInvoice}
         invoice={paymentInvoice}

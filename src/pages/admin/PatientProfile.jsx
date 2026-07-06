@@ -19,6 +19,7 @@ import { BlockSkeleton, CardsSkeleton, TableSkeleton } from '../../components/ad
 import TreatmentModal from '../../components/admin/TreatmentModal';
 import PaymentModal from '../../components/admin/PaymentModal';
 import InvoiceModal from '../../components/admin/InvoiceModal';
+import PatientModal from '../../components/admin/PatientModal';
 import ConfirmDialog from '../../components/admin/ConfirmDialog';
 import Icon from '../../components/admin/Icon';
 import { formatPKR, formatDate, formatDateTime } from '../../utils/format';
@@ -61,7 +62,10 @@ export default function PatientProfile() {
   // modals + row state
   const [treatmentModal, setTreatmentModal] = useState({ open: false, treatment: null });
   const [paymentInvoice, setPaymentInvoice] = useState(null);
+  const [editPayment, setEditPayment] = useState(null); // { payment, invoice }
   const [invoiceModalOpen, setInvoiceModalOpen] = useState(false);
+  const [editInvoice, setEditInvoice] = useState(null);
+  const [editPatientOpen, setEditPatientOpen] = useState(false);
   const [expanded, setExpanded] = useState(null);
   const [paymentsCache, setPaymentsCache] = useState({});
   const [pdfBusyId, setPdfBusyId] = useState(null);
@@ -178,8 +182,21 @@ export default function PatientProfile() {
           </svg>
           Back to Patients
         </Link>
-        <h2 className="text-2xl font-bold text-text-main mt-2">{patientName}</h2>
-        {patient?.phone && <p className="text-text-muted text-sm">{patient.phone}</p>}
+        <div className="flex flex-wrap items-start justify-between gap-3 mt-2">
+          <div>
+            <h2 className="text-2xl font-bold text-text-main">{patientName}</h2>
+            {patient?.phone && <p className="text-text-muted text-sm">{patient.phone}</p>}
+          </div>
+          {patient && (
+            <button
+              onClick={() => setEditPatientOpen(true)}
+              className="btn-outline !py-2 !px-4 text-sm inline-flex items-center gap-2"
+            >
+              <Icon name="✏" className="w-4 h-4" />
+              Edit Patient
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Tabs */}
@@ -285,9 +302,11 @@ export default function PatientProfile() {
                     <div className="flex items-center gap-3 shrink-0">
                       <button
                         onClick={() => setTreatmentModal({ open: true, treatment: t })}
-                        className="text-xs text-primary hover:text-primary-dark font-medium"
+                        title="Edit treatment"
+                        aria-label="Edit treatment"
+                        className="text-text-muted hover:text-primary"
                       >
-                        Edit
+                        <Icon name="✏" className="w-4 h-4" />
                       </button>
                       <button
                         onClick={() => setTreatmentDeleteTarget(t)}
@@ -386,6 +405,8 @@ export default function PatientProfile() {
                         payments={paymentsCache[inv.id]}
                         onToggle={() => toggleExpand(inv)}
                         onAddPayment={() => setPaymentInvoice(inv)}
+                        onEditInvoice={() => setEditInvoice(inv)}
+                        onEditPayment={(p) => setEditPayment({ payment: p, invoice: inv })}
                         onDeletePayment={(p) => setPaymentDeleteTarget({ payment: p, invoiceId: inv.id })}
                         onPdf={() => handleInvoicePdf(inv)}
                         pdfBusy={pdfBusyId === inv.id}
@@ -413,10 +434,29 @@ export default function PatientProfile() {
         onClose={() => setInvoiceModalOpen(false)}
         onSuccess={load}
       />
+      <InvoiceModal
+        isOpen={!!editInvoice}
+        invoice={editInvoice}
+        onClose={() => setEditInvoice(null)}
+        onSuccess={load}
+      />
       <PaymentModal
         isOpen={!!paymentInvoice}
         invoice={paymentInvoice}
         onClose={() => setPaymentInvoice(null)}
+        onSuccess={load}
+      />
+      <PaymentModal
+        isOpen={!!editPayment}
+        invoice={editPayment?.invoice}
+        payment={editPayment?.payment}
+        onClose={() => setEditPayment(null)}
+        onSuccess={load}
+      />
+      <PatientModal
+        isOpen={editPatientOpen}
+        patient={patient}
+        onClose={() => setEditPatientOpen(false)}
         onSuccess={load}
       />
       <ConfirmDialog
@@ -444,7 +484,7 @@ export default function PatientProfile() {
 }
 
 // Invoice row + expandable payment history.
-function FragmentRow({ inv, expanded, payments, onToggle, onAddPayment, onDeletePayment, onPdf, pdfBusy }) {
+function FragmentRow({ inv, expanded, payments, onToggle, onAddPayment, onEditInvoice, onEditPayment, onDeletePayment, onPdf, pdfBusy }) {
   const cancelled = inv.status === 'CANCELLED';
   // The ledger endpoint may send total_amount/total_paid/balance_due while the
   // billing list sends the short total/paid/balance aliases — accept either.
@@ -476,12 +516,17 @@ function FragmentRow({ inv, expanded, payments, onToggle, onAddPayment, onDelete
         </td>
         <td className="px-4 py-3"><StatusBadge status={inv.status} /></td>
         <td className="px-4 py-3">
-          <div className="flex items-center justify-end gap-3 whitespace-nowrap">
+          <div className="flex items-center justify-end gap-3 whitespace-nowrap text-xs font-medium">
             {!cancelled && balance > 0 && (
               <button onClick={onAddPayment} className="text-primary hover:text-primary-dark font-medium">+ Payment</button>
             )}
-            <button onClick={onPdf} disabled={pdfBusy} className="text-text-muted hover:text-text-main disabled:opacity-50">
-              {pdfBusy ? '...' : 'PDF'}
+            {!cancelled && (
+              <button onClick={onEditInvoice} title="Edit invoice" aria-label="Edit invoice" className="text-text-muted hover:text-primary">
+                <Icon name="✏" className="w-4 h-4" />
+              </button>
+            )}
+            <button onClick={onPdf} disabled={pdfBusy} title="Download PDF" aria-label="Download PDF" className="text-text-muted hover:text-text-main disabled:opacity-50">
+              {pdfBusy ? '...' : <Icon name="⬇" className="w-4 h-4" />}
             </button>
           </div>
         </td>
@@ -502,16 +547,28 @@ function FragmentRow({ inv, expanded, payments, onToggle, onAddPayment, onDelete
                     <span className="text-text-muted">{paymentMethodLabel(p.method || p.payment_method)}</span>
                     <span className="text-text-muted">{formatDateTime(p.payment_date || p.created_at)}</span>
                     <span className="text-text-muted">{p.received_by ? `by ${p.received_by}` : ''}</span>
-                    {!cancelled && onDeletePayment && (
-                      <button
-                        onClick={() => onDeletePayment(p)}
-                        title="Delete payment"
-                        aria-label="Delete payment"
-                        className="text-text-muted hover:text-accent"
-                      >
-                        <Icon name="🗑" className="w-4 h-4" />
-                      </button>
-                    )}
+                    <span className="flex items-center gap-2">
+                      {!cancelled && onEditPayment && (
+                        <button
+                          onClick={() => onEditPayment(p)}
+                          title="Edit payment"
+                          aria-label="Edit payment"
+                          className="text-text-muted hover:text-primary"
+                        >
+                          <Icon name="✏" className="w-4 h-4" />
+                        </button>
+                      )}
+                      {!cancelled && onDeletePayment && (
+                        <button
+                          onClick={() => onDeletePayment(p)}
+                          title="Delete payment"
+                          aria-label="Delete payment"
+                          className="text-text-muted hover:text-accent"
+                        >
+                          <Icon name="🗑" className="w-4 h-4" />
+                        </button>
+                      )}
+                    </span>
                   </li>
                 ))}
               </ul>

@@ -69,6 +69,20 @@ export function todayISO() {
   return new Intl.DateTimeFormat('en-CA', { timeZone: TZ }).format(new Date());
 }
 
+/**
+ * Convert any date value (ISO timestamp, Date, or "YYYY-MM-DD") to the
+ * "YYYY-MM-DD" string an <input type="date"> expects, evaluated in
+ * Asia/Karachi. Returns "" for empty/invalid input. Used to prefill the
+ * editable date fields when opening an edit modal (e.g. an invoice's
+ * created_at timestamp -> its calendar date).
+ */
+export function toDateInput(value) {
+  if (!value) return '';
+  const d = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(d.getTime())) return '';
+  return new Intl.DateTimeFormat('en-CA', { timeZone: TZ }).format(d);
+}
+
 export const MONTHS = [
   'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December',

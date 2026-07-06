@@ -9,7 +9,7 @@ import {
   getServices,
   unwrapList,
 } from '../../api/admin';
-import { formatDate } from '../../utils/format';
+import { formatDate, todayISO } from '../../utils/format';
 
 // Add or edit a treatment-history entry for a patient.
 export default function TreatmentModal({ isOpen, onClose, patientId, treatment, onSuccess }) {
@@ -30,6 +30,7 @@ export default function TreatmentModal({ isOpen, onClose, patientId, treatment, 
     reset({
       appointment_id: treatment?.appointment_id || '',
       service_id: treatment?.service_id || '',
+      treatment_date: treatment?.treatment_date || todayISO(),
       tooth_numbers: treatment?.tooth_numbers || '',
       diagnosis: treatment?.diagnosis || '',
       treatment_notes: treatment?.treatment_notes || '',
@@ -52,6 +53,7 @@ export default function TreatmentModal({ isOpen, onClose, patientId, treatment, 
       patient_id: patientId,
       appointment_id: data.appointment_id || undefined,
       service_id: data.service_id || undefined,
+      treatment_date: data.treatment_date,
       tooth_numbers: data.tooth_numbers || undefined,
       diagnosis: data.diagnosis || undefined,
       treatment_notes: data.treatment_notes || undefined,
@@ -75,6 +77,16 @@ export default function TreatmentModal({ isOpen, onClose, patientId, treatment, 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={isEdit ? 'Edit Treatment' : 'Add Treatment'} size="lg">
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium text-text-main mb-1">Treatment Date *</label>
+          <input
+            type="date"
+            {...register('treatment_date', { required: 'Date is required' })}
+            className="input-field"
+          />
+          {errors.treatment_date && <p className="text-accent text-sm mt-1">{errors.treatment_date.message}</p>}
+        </div>
+
         <div>
           <label className="block text-sm font-medium text-text-main mb-1">Appointment</label>
           <select {...register('appointment_id')} className="input-field" disabled={loadingData}>

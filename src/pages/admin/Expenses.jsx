@@ -9,6 +9,7 @@ import EmptyState from '../../components/admin/EmptyState';
 import { TableSkeleton, CardsSkeleton, ChartSkeleton } from '../../components/admin/Skeleton';
 import ExpenseModal from '../../components/admin/ExpenseModal';
 import ConfirmDialog from '../../components/admin/ConfirmDialog';
+import Icon from '../../components/admin/Icon';
 import { formatPKR, formatAmount, formatDate } from '../../utils/format';
 import { EXPENSE_CATEGORIES, expenseCategory } from '../../utils/constants';
 import { useChartTheme, categoryColor } from '../../utils/chartTheme';
@@ -220,8 +221,22 @@ export default function Expenses() {
                       <td className="px-4 py-3 text-right font-medium text-text-main whitespace-nowrap">{formatPKR(e.amount)}</td>
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-end gap-3 text-xs font-medium whitespace-nowrap">
-                          <button onClick={() => setModal({ open: true, expense: e })} className="text-primary hover:text-primary-dark">Edit</button>
-                          <button onClick={() => setDeleteTarget(e)} className="text-accent hover:text-red-700">Delete</button>
+                          <button
+                            onClick={() => setModal({ open: true, expense: e })}
+                            title="Edit expense"
+                            aria-label="Edit expense"
+                            className="text-text-muted hover:text-primary"
+                          >
+                            <Icon name="✏" className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => setDeleteTarget(e)}
+                            title="Delete expense"
+                            aria-label="Delete expense"
+                            className="text-text-muted hover:text-accent"
+                          >
+                            <Icon name="🗑" className="w-4 h-4" />
+                          </button>
                         </div>
                       </td>
                     </tr>
