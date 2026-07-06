@@ -13,9 +13,21 @@ import Icon from '../../components/admin/Icon';
 import { formatPKR, formatDate } from '../../utils/format';
 import { INVOICE_STATUSES } from '../../utils/constants';
 
-const PAGE_SIZE = 20;
+// Invoices are shown all-at-once in a scrollable list (newest first) rather than
+// paged. We still page the *fetch* under the hood in chunks so a backend that
+// caps `limit` can't silently truncate the history.
+const FETCH_CHUNK = 200;
+const MAX_PAGES = 100; // safety cap: up to 20k invoices
 
 const num = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
+
+// Newest first: by created_at / invoice_date desc, tie-broken by id desc.
+const byNewest = (a, b) => {
+  const da = new Date(a.created_at || a.invoice_date || 0).getTime();
+  const db = new Date(b.created_at || b.invoice_date || 0).getTime();
+  if (db !== da) return db - da;
+  return num(b.id) - num(a.id);
+};
 
 export default function Billing() {
   const [raw, setRaw] = useState([]);
@@ -28,7 +40,6 @@ export default function Billing() {
   const [to, setTo] = useState('');
   const [search, setSearch] = useState('');
   const [searchInput, setSearchInput] = useState('');
-  const [page, setPage] = useState(1);
 
   const [invoiceModalOpen, setInvoiceModalOpen] = useState(false);
   const [editInvoice, setEditInvoice] = useState(null);
@@ -40,30 +51,53 @@ export default function Billing() {
   const [deleteForce, setDeleteForce] = useState(false);
   const [pdfBusyId, setPdfBusyId] = useState(null);
 
+  // Load every invoice matching the current filters, paging through the backend
+  // in chunks and accumulating so nothing is lost to a server-side limit cap.
   const fetchInvoices = useCallback(() => {
     setLoading(true);
-    getInvoices({ status, from, to, search, page, limit: PAGE_SIZE })
-      .then((data) => {
-        setRaw(unwrapList(data, 'invoices', 'data'));
-        const t = Number(data?.total);
-        setServerTotal(Number.isFinite(t) ? t : null);
+    (async () => {
+      const all = [];
+      const seen = new Set();
+      let capturedStats = null;
+      let reportedTotal = null;
+
+      for (let page = 1; page <= MAX_PAGES; page++) {
+        const data = await getInvoices({ status, from, to, search, page, limit: FETCH_CHUNK });
+        const list = unwrapList(data, 'invoices', 'data');
+
         // Backend is assumed to return month-to-date stats independent of filters.
-        if (data && typeof data === 'object' && data.stats) setStats(data.stats);
+        if (!capturedStats && data && typeof data === 'object' && data.stats) capturedStats = data.stats;
+        const t = Number(data?.total);
+        if (Number.isFinite(t)) reportedTotal = t;
+
+        let added = 0;
+        for (const inv of list) {
+          const key = inv.id ?? inv.invoice_number ?? JSON.stringify(inv);
+          if (!seen.has(key)) { seen.add(key); all.push(inv); added += 1; }
+        }
+
+        // Stop when the page wasn't full (no more rows), nothing new came back
+        // (backend ignores paging), or we've reached the reported total.
+        if (list.length < FETCH_CHUNK || added === 0) break;
+        if (reportedTotal != null && all.length >= reportedTotal) break;
+      }
+
+      return { all, reportedTotal, stats: capturedStats };
+    })()
+      .then(({ all, reportedTotal, stats }) => {
+        setRaw(all);
+        setServerTotal(reportedTotal);
+        if (stats) setStats(stats);
       })
       .catch(() => toast.error('Failed to load invoices'))
       .finally(() => setLoading(false));
-  }, [status, from, to, search, page]);
+  }, [status, from, to, search]);
 
   useEffect(() => { fetchInvoices(); }, [fetchInvoices]);
 
-  // Reset to page 1 whenever a filter changes.
-  useEffect(() => { setPage(1); }, [status, from, to, search]);
-
-  // Server-paginated when the backend reports a total; otherwise paginate client-side.
-  const serverPaginated = serverTotal != null;
-  const total = serverPaginated ? serverTotal : raw.length;
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-  const rows = serverPaginated ? raw : raw.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  // Every matching invoice, newest first — rendered in one scrollable list.
+  const rows = [...raw].sort(byNewest);
+  const total = serverTotal != null ? serverTotal : raw.length;
 
   // Derived fallback stats from whatever invoices we have (used only if backend omits stats).
   const fallbackOutstanding = raw
@@ -223,9 +257,15 @@ export default function Billing() {
         </div>
       ) : (
         <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-          <div className="overflow-x-auto">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 bg-gray-50 text-sm">
+            <span className="font-medium text-text-main">All Invoices</span>
+            <span className="text-text-muted">
+              {total} invoice{total !== 1 ? 's' : ''}, newest first
+            </span>
+          </div>
+          <div className="overflow-auto max-h-[65vh]">
             <table className="w-full text-sm">
-              <thead className="bg-gray-50">
+              <thead className="bg-gray-50 sticky top-0 z-10 [&>tr>th]:border-b [&>tr>th]:border-gray-200">
                 <tr>
                   <th className="px-4 py-3 text-left font-medium text-text-muted">Invoice #</th>
                   <th className="px-4 py-3 text-left font-medium text-text-muted">Patient</th>
@@ -308,30 +348,6 @@ export default function Billing() {
                 })}
               </tbody>
             </table>
-          </div>
-
-          {/* Pagination */}
-          <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100 bg-gray-50 text-sm">
-            <span className="text-text-muted">
-              Showing {rows.length} of {total} invoice{total !== 1 ? 's' : ''}
-            </span>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={page <= 1}
-                className="px-3 py-1.5 rounded-lg border border-gray-200 text-text-main disabled:opacity-40 hover:bg-gray-100"
-              >
-                Prev
-              </button>
-              <span className="text-text-muted">Page {page} of {totalPages}</span>
-              <button
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                disabled={page >= totalPages}
-                className="px-3 py-1.5 rounded-lg border border-gray-200 text-text-main disabled:opacity-40 hover:bg-gray-100"
-              >
-                Next
-              </button>
-            </div>
           </div>
         </div>
       )}
